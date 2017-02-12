@@ -1,6 +1,7 @@
 package parsers
 
 import (
+	"fmt"
 	"github.com/beevik/etree"
 	"github.com/nicolasgomollon/peterplanner/types"
 	"strconv"
@@ -9,25 +10,58 @@ import (
 
 /* DegreeWorks XML Parser */
 
-func Parse(doc *etree.Document) (map[string]types.Course, map[string]bool, []types.Block, map[string]bool) {
+func Parse(doc *etree.Document) (types.Student, map[string]bool) {
 	courses := make(map[string]types.Course, 0)
 	taken := make(map[string]bool, 0)
 	blocks := make([]types.Block, 0)
 	prereqDepts := make(map[string]bool, 0)
+	
 	root := doc.SelectElement("Report").SelectElement("Audit")
+	audit := root.SelectElement("AuditHeader")
+	studentID := audit.SelectAttrValue("Stu_id", "XXXXXXXX")
+	name := audit.SelectAttrValue("Stu_name", "ANTEATER, PETER THE")
+	email := audit.SelectAttrValue("Stu_email", "PTANTEATER@UCI.EDU")
+	student := types.Student{StudentID: studentID, Name: name, Email: email}
+	
 	for _, block := range root.SelectElements("Block") {
 		reqType := block.SelectAttrValue("Req_type", "unknown")
-		if (reqType == "PROGRAM") {
+		switch reqType {
+		case "DEGREE":
+			gpa, _ := strconv.ParseFloat(block.SelectAttrValue("GPA", "0.0"), 64)
+			student.GPA = gpa
+			
+			percentComplete, _ := strconv.ParseFloat(block.SelectAttrValue("Per_complete", "0.0"), 64)
+			student.PercentComplete = percentComplete
+			
+			creditsApplied, _ := strconv.ParseFloat(block.SelectAttrValue("Credits_applied", "0.0"), 64)
+			student.CreditsApplied = creditsApplied
+			
+			classLevelKey := strings.Replace(fmt.Sprintf("%v STANDING ONLY", student.ClassLevel()), " ", "", -1)
+			taken[classLevelKey] = true
+			
+			standingKey := strings.Replace(fmt.Sprintf("%v STANDING ONLY", student.Standing()), " ", "", -1)
+			taken[standingKey] = true
+			break
+		case "PROGRAM":
 			parseProgram(block, &courses, &taken, &blocks, &prereqDepts)
-		} else if (reqType == "MAJOR") || (reqType == "MINOR") {
+			break
+		case "MAJOR", "MINOR":
 			parseBlock(block, &courses, &taken, &blocks, &prereqDepts)
+			break
+		default:
+			break
 		}
 	}
-	return courses, taken, blocks, prereqDepts
+	
+	student.Courses = courses
+	student.Taken = taken
+	student.Blocks = blocks
+	
+	return student, prereqDepts
 }
 
 func parseProgram(block *etree.Element, courses *map[string]types.Course, taken *map[string]bool, blocks *[]types.Block, prereqDepts *map[string]bool) {
-	
+	// TODO: Parse for things like "LOWER DIVISION WRITING" and "UPPER DIVISION WRITING"
 }
 
 func parseBlock(block *etree.Element, courses *map[string]types.Course, taken *map[string]bool, blocks *[]types.Block, prereqDepts *map[string]bool) {

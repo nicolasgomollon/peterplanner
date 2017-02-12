@@ -63,19 +63,19 @@ func (course Course) Key() string {
 	return strings.Replace(strings.ToUpper(course.Department + course.Number), " ", "", -1)
 }
 
-func (course Course) ClearedPrereqs(courses map[string]Course, taken map[string]bool) bool {
+func (course Course) ClearedPrereqs(student Student) bool {
 	for _, prereqsAND := range course.Prerequisites {
 		satisfied := false
 		for _, prereqOR := range prereqsAND {
 			if !satisfied {
 				splitPrrq := strings.Split(prereqOR, "|")
 				prereq := strings.Replace(splitPrrq[0], " ", "", -1)
-				satisfied = taken[prereq]
+				satisfied = student.Taken[prereq]
 				if !satisfied && strings.HasPrefix(splitPrrq[0], "NO ") {
 					prereq = strings.TrimPrefix(prereq, "NO")
-					satisfied = !taken[prereq]
+					satisfied = !student.Taken[prereq]
 				} else if satisfied && (len(splitPrrq) == 2) {
-					c := courses[prereq]
+					c := student.Courses[prereq]
 					grade := splitPrrq[1]
 					if (len(c.Grade) != 0) && (len(grade) != 0) {
 						if cmpGrade(c.Grade, grade) > 0 {
@@ -83,19 +83,8 @@ func (course Course) ClearedPrereqs(courses map[string]Course, taken map[string]
 						}
 					}
 				}
-				// ALSO, WHAT TO DO WITH ITEMS LIKE "LOWER DIVISION WRITING" OR "UPPER DIVISION STANDING ONLY"
 				//
-				// UPPER DIVISION STANDING ONLY:
-				//   Only students within the junior and senior class levels
-				//   (90 or more units) are eligible for enrollment.
-				//
-				// SENIOR STANDING ONLY:
-				//   Only students within the Senior class level
-				//   (135 or more units) are eligible for enrollment.
-				//
-				// JUNIOR STANDING ONLY:
-				//   Only students within the Junior class level
-				//   (90.0 through 134.9 units) are eligible for enrollment.
+				// ALSO, WHAT TO DO WITH ITEMS LIKE "LOWER DIVISION WRITING"?
 				//
 				// information from:
 				// https://www.reg.uci.edu/enrollment/restrict_codes.html
@@ -106,6 +95,7 @@ func (course Course) ClearedPrereqs(courses map[string]Course, taken map[string]
 			}
 		}
 		if !satisfied {
+			// TODO: Compile entire list of missing prerequisites.
 			fmt.Printf("  %v %v -- ", course.Department, course.Number)
 			fmt.Printf("[\"%s\"]\n", strings.Join(prereqsAND, "\", \""))
 			return false
@@ -120,6 +110,45 @@ type Requirement struct {
 }
 
 type Block struct {
-	Taken        map[string]bool `json:"taken"`
-	Requirements []Requirement   `json:"requirements"`
+	ReqType      string        `json:"type"`
+	Title        string        `json:"title"`
+	Requirements []Requirement `json:"requirements"`
+}
+
+type Student struct {
+	StudentID       string            `json:"studentID"`
+	Name            string            `json:"name"`
+	Email           string            `json:"email"`
+	GPA             float64           `json:"gpa"`
+	PercentComplete float64           `json:"percentComplete"`
+	CreditsApplied  float64           `json:"creditsApplied"`
+	Courses         map[string]Course `json:"courses"`
+	Taken           map[string]bool   `json:"taken"`
+	Blocks          []Block           `json:"blocks"`
+}
+
+func (student Student) ClassLevel() string {
+	credits := student.CreditsApplied
+	switch {
+	case (135.0 <= credits):
+		return "SENIOR"
+	case (90.0 <= credits) && (credits < 135.0):
+		return "JUNIOR"
+	case (45.0 <= credits) && (credits < 90.0):
+		return "SOPHOMORE"
+	case (0.0 <= credits) && (credits < 45.0):
+		return "FRESHMAN"
+	}
+	return ""
+}
+
+func (student Student) Standing() string {
+	credits := student.CreditsApplied
+	switch {
+	case (90.0 <= credits):
+		return "UPPER DIVISION"
+	case (0.0 <= credits) && (credits < 90.0):
+		return "LOWER DIVISION"
+	}
+	return ""
 }
