@@ -20,7 +20,7 @@ const DegreeWorksURL = "https://www.reg.uci.edu/dgw/IRISLink.cgi"
 
 func fetchStudentID(cookie string) (string, error) {
 	body := "SERVICE=SCRIPTER&SCRIPT=SD2STUCON"
-	statusCode, responseHTML, err := helpers.Post(DegreeWorksURL, cookie, body)
+	statusCode, _, responseHTML, err := helpers.Post(DegreeWorksURL, cookie, body)
 	if err != nil {
 		return "", errors.New(fmt.Sprintf("ERROR: Unable to fetch DegreeWorks HTML file. `%v`.", err.Error()))
 	} else if statusCode != http.StatusOK {
@@ -37,7 +37,7 @@ func fetchStudentID(cookie string) (string, error) {
 
 func fetchStudentDetails(studentID, cookie string) (string, string, string, string, string, error) {
 	body := fmt.Sprintf("SERVICE=SCRIPTER&SCRIPT=SD2STUGID&STUID=%s&DEBUG=OFF", studentID)
-	statusCode, responseHTML, err := helpers.Post(DegreeWorksURL, cookie, body)
+	statusCode, _, responseHTML, err := helpers.Post(DegreeWorksURL, cookie, body)
 	if err != nil {
 		return "", "", "", "", "", errors.New(fmt.Sprintf("ERROR: Unable to fetch DegreeWorks HTML file. `%v`.", err.Error()))
 	} else if statusCode != http.StatusOK {
@@ -74,7 +74,7 @@ func fetchXML(studentID, school, degree, degreeName, studentLevel, studentMajor,
 	studentMajor = html.UnescapeString(studentMajor)
 	studentMajor = url.QueryEscape(studentMajor)
 	body := fmt.Sprintf("SERVICE=SCRIPTER&REPORT=WEB31&SCRIPT=SD2GETAUD%%26ContentType%%3Dxml&USERID=%s&USERCLASS=STU&BROWSER=NOT-NAV4&ACTION=REVAUDIT&AUDITTYPE&DEGREETERM=ACTV&INTNOTES&INPROGRESS=N&CUTOFFTERM=ACTV&REFRESHBRDG=N&AUDITID&JSERRORCALL=SetError&NOTENUM&NOTETEXT&NOTEMODE&PENDING&INTERNAL&RELOADSEP=TRUE&PRELOADEDPLAN&ContentType=xml&STUID=%s&SCHOOL=%s&STUSCH=%s&DEGREE=%s&STUDEG=%s&STUDEGLIT=%s&STUDI&STULVL=%s&STUMAJLIT=%s&STUCATYEAR&CLASSES&DEBUG=OFF", studentID, studentID, school, school, degree, degree, degreeName, studentLevel, studentMajor)
-	statusCode, responseXML, err := helpers.Post(DegreeWorksURL, cookie, body)
+	statusCode, _, responseXML, err := helpers.Post(DegreeWorksURL, cookie, body)
 	if err != nil {
 		return "", errors.New(fmt.Sprintf("ERROR: Unable to fetch DegreeWorks XML file. `%v`.", err.Error()))
 	} else if statusCode != http.StatusOK {
@@ -85,7 +85,7 @@ func fetchXML(studentID, school, degree, degreeName, studentLevel, studentMajor,
 
 func fetchBasicXML(studentID string, cookie string) (string, error) {
 	body := fmt.Sprintf("SERVICE=SCRIPTER&REPORT=WEB31&SCRIPT=SD2GETAUD%%26ContentType%%3Dxml&ACTION=REVAUDIT&ContentType=xml&STUID=%v&DEBUG=OFF", studentID)
-	statusCode, responseXML, err := helpers.Post(DegreeWorksURL, cookie, body)
+	statusCode, _, responseXML, err := helpers.Post(DegreeWorksURL, cookie, body)
 	if err != nil {
 		return "", errors.New(fmt.Sprintf("ERROR: Unable to fetch DegreeWorks XML file. `%v`.", err.Error()))
 	} else if statusCode != http.StatusOK {
@@ -120,19 +120,55 @@ func parse(doc *etree.Document) {
 		parsers.ParsePrerequisites(term, option, &student.Courses)
 	}
 	
-	fmt.Println("Cleared Classes:")
+	// fmt.Println("Cleared Courses:")
 	canTake := make([]types.Course, 0)
+	toCheck := make(map[string][]string, 0)
+	for _, block := range student.Blocks {
+		// fmt.Printf("%v: %v\n", block.ReqType, block.Title)
+		for _, req := range block.Requirements {
+			// fmt.Printf("- %d classes remaining in:\n", req.Required)
+			for _, option := range req.Options {
+				course := student.Courses[option]
+				if course.ClearedPrereqs(student) {
+					// fmt.Printf("  %v %v\n", course.Department, course.Number)
+					
+					courseNums := toCheck[course.Department]
+					if courseNums == nil {
+						courseNums = make([]string, 0)
+					}
+					courseNums = append(courseNums, course.Number)
+					toCheck[course.Department] = courseNums
+					
+					canTake = append(canTake, course)
+				}
+				// fmt.Printf("    %v: %v\n", course.Title)
+			}
+		}
+	}
+	
+	offered := make(map[string]bool, 0)
+	yearTerm := parsers.SpringQuarter(parsers.YearSQ())
+	for dept, courseNums := range toCheck {
+		responseTXT, err := parsers.FetchWebSOC(yearTerm, dept, courseNums)
+		if err != nil {
+			panic(err)
+		}
+		parsers.ParseWebSOC(responseTXT, &student.Courses, &offered)
+	}
+	
+	fmt.Println("Offered Courses:")
 	for _, block := range student.Blocks {
 		fmt.Printf("%v: %v\n", block.ReqType, block.Title)
 		for _, req := range block.Requirements {
 			fmt.Printf("- %d classes remaining in:\n", req.Required)
 			for _, option := range req.Options {
-				course := student.Courses[option]
-				if course.ClearedPrereqs(student) {
-					fmt.Printf("  %v %v\n", course.Department, course.Number)
-					canTake = append(canTake, course)
+				if offered[option] {
+					course := student.Courses[option]
+					fmt.Printf("  %v %v: %v\n", course.Department, course.Number, course.Title)
+					for _, class := range course.Classes {
+						fmt.Printf("    `%v` `%v` `%v` `%v` `%v` `%v` `%v`\n", class.Code, class.Type, class.Section, class.Instructor, class.Days, class.Time, class.Place)
+					}
 				}
-				// fmt.Printf("    %v: %v\n", course.Title)
 			}
 		}
 	}

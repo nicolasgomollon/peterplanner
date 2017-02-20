@@ -1,9 +1,11 @@
 package types
 
 import (
-	"fmt"
+	// "fmt"
 	"math"
+	"regexp"
 	"strings"
+	"time"
 )
 
 func cmpGrade(grA string, grB string) int64 {
@@ -51,12 +53,81 @@ func cmpGrade(grA string, grB string) int64 {
 	return comparison
 }
 
+type Time struct {
+	Start time.Time `json:"start"`
+	End   time.Time `json:"end"`
+}
+
+func (t Time) Duration() time.Duration {
+	return t.End.Sub(t.Start)
+}
+
+func ParseTime(cTime string) Time {
+	cStart := strings.TrimSpace(cTime[0:5])
+	cEnd := strings.TrimSpace(cTime[6:11])
+	pm := (len(cTime) == 12)
+	
+	format := "3:04"
+	start, _ := time.Parse(format, cStart)
+	end, _ := time.Parse(format, cEnd)
+	
+	if (end.Hour() < 12) && pm {
+		end = end.Add(time.Hour * time.Duration(12))
+	}
+	
+	if end.Sub(start).Hours() >= 12.0 {
+		start = start.Add(time.Hour * time.Duration(12))
+	}
+	
+	return Time{Start: start, End: end}
+}
+
+func ParseDays(cDays string) []time.Weekday {
+	r, _ := regexp.Compile(`[A-Z][a-z]?`)
+	rawDays := r.FindAllStringSubmatch(cDays, -1)
+	
+	days := make([]time.Weekday, len(rawDays))
+	for i, rawDay := range rawDays {
+		switch rawDay[0] {
+		case "Su":
+			days[i] = time.Sunday
+		case "M":
+			days[i] = time.Monday
+		case "Tu":
+			days[i] = time.Tuesday
+		case "W":
+			days[i] = time.Wednesday
+		case "Th":
+			days[i] = time.Thursday
+		case "F":
+			days[i] = time.Friday
+		case "Sa":
+			days[i] = time.Saturday
+		default:
+			break
+		}
+	}
+	
+	return days
+}
+
+type Class struct {
+	Code       string         `json:"code"`
+	Type       string         `json:"type"`
+	Section    string         `json:"section"`
+	Instructor string         `json:"instructor"`
+	Days       []time.Weekday `json:"days"`
+	Time       Time           `json:"time"`
+	Place      string         `json:"place"`
+}
+
 type Course struct {
 	Department    string     `json:"department"`
 	Number        string     `json:"number"`
 	Title         string     `json:"title"`
 	Grade         string     `json:"grade"`
 	Prerequisites [][]string `json:"prerequisites"`
+	Classes       []Class    `json:"classes"`
 }
 
 func (course Course) Key() string {
@@ -96,8 +167,8 @@ func (course Course) ClearedPrereqs(student Student) bool {
 		}
 		if !satisfied {
 			// TODO: Compile entire list of missing prerequisites.
-			fmt.Printf("  %v %v -- ", course.Department, course.Number)
-			fmt.Printf("[\"%s\"]\n", strings.Join(prereqsAND, "\", \""))
+			// fmt.Printf("  %v %v -- ", course.Department, course.Number)
+			// fmt.Printf("[\"%s\"]\n", strings.Join(prereqsAND, "\", \""))
 			return false
 		}
 	}

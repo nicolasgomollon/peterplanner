@@ -36,7 +36,7 @@ func Get(url string) (statusCode int, responseBody string, err error) {
 	return statusCode, string(contents), nil
 }
 
-func Post(url string, cookie string, data string) (statusCode int, responseBody string, err error) {
+func Post(url string, cookie string, data string) (statusCode int, contentType string, responseBody string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = r.(error)
@@ -56,6 +56,7 @@ func Post(url string, cookie string, data string) (statusCode int, responseBody 
 		panic(err)
 	}
 	statusCode = response.StatusCode
+	contentType = strings.Split(response.Header["Content-Type"][0], ";")[0]
 
 	defer response.Body.Close()
 	contents, err := ioutil.ReadAll(response.Body)
@@ -63,5 +64,5 @@ func Post(url string, cookie string, data string) (statusCode int, responseBody 
 		panic(err)
 	}
 
-	return statusCode, string(contents), nil
+	return statusCode, contentType, string(contents), nil
 }
