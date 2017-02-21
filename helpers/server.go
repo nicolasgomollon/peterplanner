@@ -50,7 +50,9 @@ func Post(url string, cookie string, data string) (statusCode int, contentType s
 	}
 
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	request.Header.Set("Cookie", cookie)
+	if len(cookie) > 0 {
+		request.Header.Set("Cookie", cookie)
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		panic(err)
