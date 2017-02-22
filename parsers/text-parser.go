@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/nicolasgomollon/peterplanner/helpers"
 	"github.com/nicolasgomollon/peterplanner/types"
+	"html"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -16,6 +17,37 @@ import (
 /* WebSOC Text Parser */
 
 const WebSocURL = "https://www.reg.uci.edu/perl/WebSoc/"
+
+func IsAcademicTerm(term string) bool {
+	if len(term) == 7 {
+		switch term[5:] {
+		case "92", "03", "14":
+			return true
+		}
+	}
+	return false
+}
+
+func IsFQ(term string) bool {
+	if IsAcademicTerm(term) {
+		return term[5:] == "92"
+	}
+	return false
+}
+
+func IsWQ(term string) bool {
+	if IsAcademicTerm(term) {
+		return term[5:] == "03"
+	}
+	return false
+}
+
+func IsSQ(term string) bool {
+	if IsAcademicTerm(term) {
+		return term[5:] == "14"
+	}
+	return false
+}
 
 func FallQuarter(year int) string {
 	return fmt.Sprintf("%v-92", year)
@@ -53,6 +85,38 @@ func YearSQ() int {
 		year++
 	}
 	return year
+}
+
+func AcademicYear() int {
+	currentDate := time.Now()
+	year := currentDate.Year()
+	month := currentDate.Month()
+	if month <= time.June {
+		year--
+	}
+	return year
+}
+
+func SDepartmentOptions() (string, map[string]string, error) {
+	statusCode, responseHTML, err := helpers.Get(WebSocURL)
+	if err != nil {
+		return "", nil, errors.New(fmt.Sprintf("ERROR: Unable to fetch WebSOC HTML file. `%v`.", err.Error()))
+	} else if statusCode != http.StatusOK {
+		return "", nil, errors.New(fmt.Sprintf("ERROR: Unable to fetch WebSOC HTML file. HTTP status code: %v.", statusCode))
+	}
+	r, _ := regexp.Compile(`<option value="(.*?)".*?>`)
+	term := r.FindStringSubmatch(responseHTML)[1]
+	r, _ = regexp.Compile(`(?s)<select name="Dept">(.*?)</select>`)
+	departments := r.FindStringSubmatch(responseHTML)[1]
+	r, _ = regexp.Compile(`<option value="(.*?)">`)
+	options := r.FindAllStringSubmatch(departments, -1)
+	deptOptions := make(map[string]string, 0)
+	for _, option := range options {
+		opt := html.UnescapeString(option[1])
+		key := strings.Replace(strings.ToUpper(opt), " ", "", -1)
+		deptOptions[key] = opt
+	}
+	return term, deptOptions, nil
 }
 
 func FetchWebSOC(yearTerm, dept string, courseNums []string) (string, error) {

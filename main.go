@@ -11,9 +11,11 @@ import (
 	"github.com/nicolasgomollon/peterplanner/types"
 	"golang.org/x/net/html/charset"
 	"html"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 )
 
 const DegreeWorksURL = "https://www.reg.uci.edu/dgw/IRISLink.cgi"
@@ -114,10 +116,14 @@ func readFromFile(fileName string) {
 
 func parse(doc *etree.Document) {
 	student, prereqDepts := parsers.Parse(doc)
-	term, deptOptions, _ := parsers.DepartmentOptions()
 	for dept, _ := range prereqDepts {
-		option := deptOptions[dept]
-		parsers.ParsePrerequisites(term, option, &student.Courses)
+		dir := strings.Replace(dept, "/", "_", -1)
+		b, err := ioutil.ReadFile(fmt.Sprintf("/var/www/registrar/%v/prereqs.html", dir))
+		if err != nil {
+			panic(err)
+		}
+		responseHTML := string(b)
+		parsers.ParsePrerequisites(responseHTML, &student.Courses)
 	}
 	
 	// fmt.Println("Cleared Courses:")
@@ -147,12 +153,17 @@ func parse(doc *etree.Document) {
 	}
 	
 	offered := make(map[string]bool, 0)
-	yearTerm := parsers.SpringQuarter(parsers.YearSQ())
-	for dept, courseNums := range toCheck {
-		responseTXT, err := parsers.FetchWebSOC(yearTerm, dept, courseNums)
+	// TODO: Where to pull current `yearTerm`?
+	// yearTerm := parsers.SpringQuarter(parsers.YearSQ())
+	// TODO: What to do with `toCheck->courseNums`?
+	for dept, _ := range toCheck {
+		dir := strings.Replace(dept, "/", "_", -1)
+		// TODO: In production, we'd probably fetch these details from a pre-parsed JSON file.
+		b, err := ioutil.ReadFile(fmt.Sprintf("/var/www/registrar/%v/soc_%v.txt", dir, "2017-14"))
 		if err != nil {
 			panic(err)
 		}
+		responseTXT := string(b)
 		parsers.ParseWebSOC(responseTXT, &student.Courses, &offered)
 	}
 	

@@ -18,7 +18,7 @@ import (
 const PrereqsURL = "https://www.reg.uci.edu/cob/prrqcgi"
 const PrereqsFormatURL = "https://www.reg.uci.edu/cob/prrqcgi?dept=%v&action=view_by_term&term=%v"
 
-func DepartmentOptions() (string, map[string]string, error) {
+func PDepartmentOptions() (string, map[string]string, error) {
 	statusCode, responseHTML, err := helpers.Get(PrereqsURL)
 	if err != nil {
 		return "", nil, errors.New(fmt.Sprintf("ERROR: Unable to fetch WebSOC Prerequisites HTML file. `%v`.", err.Error()))
@@ -39,12 +39,18 @@ func DepartmentOptions() (string, map[string]string, error) {
 	return term, deptOptions, nil
 }
 
-func ParsePrerequisites(term string, option string, courses *map[string]types.Course) {
-	_, responseHTML, _ := helpers.Get(fmt.Sprintf(PrereqsFormatURL, option, term))
-	
+func FetchPrerequisites(term string, option string) (string, error) {
+	statusCode, responseHTML, err := helpers.Get(fmt.Sprintf(PrereqsFormatURL, option, term))
+	if err != nil {
+		return "", errors.New(fmt.Sprintf("ERROR: Unable to fetch WebSOC Prerequisites HTML file. `%v`.", err.Error()))
+	} else if statusCode != http.StatusOK {
+		return "", errors.New(fmt.Sprintf("ERROR: Unable to fetch WebSOC Prerequisites HTML file. HTTP status code: %v.", statusCode))
+	}
+	return responseHTML, nil
+}
+
+func ParsePrerequisites(responseHTML string, courses *map[string]types.Course) {
 	r, _ := regexp.Compile(`(?s)<table width="800"(?:[^>]*)>(.*?)<\/table>`)
-	// fmt.Println(responseHTML)
-	// fmt.Println(r.FindStringSubmatch(responseHTML))
 	rawPrereqs := r.FindStringSubmatch(responseHTML)[1]
 	
 	r, _ = regexp.Compile(`(?s)<tr>(.*?)<\/tr>`)
