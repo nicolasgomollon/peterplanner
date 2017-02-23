@@ -232,7 +232,8 @@ func parse(doc *etree.Document) {
 				if cleared {
 					icon = "✓"
 				}
-				fmt.Printf("%v %v %v: %v     offered: %v\n", icon, course.Department, course.Number, course.Title, termsOffered)
+				
+				fmt.Printf("%-35s   offered: %v\n", fmt.Sprintf("%v %v %v: %v", icon, course.Department, course.Number, course.Title), termsOffered)
 				if cleared {
 					for _, class := range course.Classes[yearTerm] {
 						fmt.Printf("    %v %v %v %v\n", class.Code, class.Type, class.Section, class.Instructor)
