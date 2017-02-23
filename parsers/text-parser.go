@@ -164,7 +164,7 @@ func (token Token) Len() int {
 // 	return string(subscriptionJSON), nil
 // }
 
-func ParseWebSOC(responseTXT string, courses *map[string]types.Course, offered *map[string]bool) error {
+func ParseWebSOC(yearTerm, responseTXT string, courses *map[string]types.Course, offered *map[string]bool) error {
 	scanner := bufio.NewScanner(strings.NewReader(responseTXT))
 	shouldParse := false
 	for scanner.Scan() {
@@ -270,12 +270,17 @@ func ParseWebSOC(responseTXT string, courses *map[string]types.Course, offered *
 				if len(course.Title) == 0 {
 					course.Title = cTitle
 				}
-				classes := course.Classes
+				classesMap := course.Classes
+				if classesMap == nil {
+					classesMap = make(map[string][]types.Class, 0)
+				}
+				classes := classesMap[yearTerm]
 				if classes == nil {
 					classes = make([]types.Class, 0)
 				}
 				classes = append(classes, class)
-				course.Classes = classes
+				classesMap[yearTerm] = classes
+				course.Classes = classesMap
 				(*courses)[k] = course
 				(*offered)[k] = true
 			}

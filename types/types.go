@@ -121,12 +121,12 @@ type Class struct {
 }
 
 type Course struct {
-	Department    string     `json:"department"`
-	Number        string     `json:"number"`
-	Title         string     `json:"title"`
-	Grade         string     `json:"grade"`
-	Prerequisites [][]string `json:"prerequisites"`
-	Classes       []Class    `json:"classes"`
+	Department    string             `json:"department"`
+	Number        string             `json:"number"`
+	Title         string             `json:"title"`
+	Grade         string             `json:"grade"`
+	Prerequisites [][]string         `json:"prerequisites"`
+	Classes       map[string][]Class `json:"classes"`
 }
 
 func (course Course) Key() string {
@@ -195,6 +195,7 @@ type Student struct {
 	Courses         map[string]Course `json:"courses"`
 	Taken           map[string]bool   `json:"taken"`
 	Blocks          []Block           `json:"blocks"`
+	Terms           []string          `json:"terms"`
 }
 
 func (student Student) ClassLevel() string {

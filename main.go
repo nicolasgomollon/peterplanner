@@ -14,7 +14,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -114,6 +117,26 @@ func readFromFile(fileName string) {
 	parse(doc)
 }
 
+type File struct {
+	Name string
+	Term string
+}
+
+func schedulesFor(deptPath string, termsMap *map[string]bool) []File {
+	r, _ := regexp.Compile(`soc_(\d{4}-\d{2})\.txt`)
+	files := make([]File, 0)
+	filepath.Walk(deptPath, func(path string, f os.FileInfo, _ error) error {
+		filename := f.Name()
+		if strings.HasPrefix(filename, "soc_") {
+			term := r.FindStringSubmatch(filename)[1]
+			(*termsMap)[term] = true
+			files = append(files, File{Name: filename, Term: term})
+		}
+		return nil
+	})
+	return files
+}
+
 func parse(doc *etree.Document) {
 	student, prereqDepts := parsers.Parse(doc)
 	for dept, _ := range prereqDepts {
@@ -152,20 +175,32 @@ func parse(doc *etree.Document) {
 		}
 	}
 	
+	termsMap := make(map[string]bool, 0)
 	offered := make(map[string]bool, 0)
-	// TODO: Where to pull current `yearTerm`?
-	yearTerm := parsers.SpringQuarter(parsers.YearSQ())
 	// TODO: What to do with `toCheck->courseNums`?
 	for dept, _ := range toCheck {
 		dir := strings.Replace(dept, "/", "_", -1)
-		// TODO: In production, we'd probably fetch these details from a pre-parsed JSON file.
-		b, err := ioutil.ReadFile(fmt.Sprintf("/var/www/registrar/%v/soc_%v.txt", dir, yearTerm))
-		if err != nil {
-			panic(err)
+		deptPath := fmt.Sprintf("/var/www/registrar/%v/", dir)
+		files := schedulesFor(deptPath, &termsMap)
+		for _, file := range files {
+			b, err := ioutil.ReadFile(deptPath + file.Name)
+			if err != nil {
+				panic(err)
+			}
+			responseTXT := string(b)
+			parsers.ParseWebSOC(file.Term, responseTXT, &student.Courses, &offered)
 		}
-		responseTXT := string(b)
-		parsers.ParseWebSOC(responseTXT, &student.Courses, &offered)
 	}
+	
+	terms := make([]string, len(termsMap))
+	i := 0
+	for t := range termsMap {
+		terms[i] = t
+		i++
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(terms)))
+	student.Terms = terms
+	yearTerm := terms[0]
 	
 	fmt.Println("Offered Courses:")
 	for _, block := range student.Blocks {
@@ -175,8 +210,13 @@ func parse(doc *etree.Document) {
 			for _, option := range req.Options {
 				if offered[option] {
 					course := student.Courses[option]
-					fmt.Printf("  %v %v: %v\n", course.Department, course.Number, course.Title)
-					for _, class := range course.Classes {
+					termsOffered := make(map[string]int, 0)
+					for k := range course.Classes {
+						t := k[5:]
+						termsOffered[t]++
+					}
+					fmt.Printf("  %v %v: %v   offered: %v\n", course.Department, course.Number, course.Title, termsOffered)
+					for _, class := range course.Classes[yearTerm] {
 						fmt.Printf("    %v %v %v %v\n", class.Code, class.Type, class.Section, class.Instructor)
 					}
 				}
