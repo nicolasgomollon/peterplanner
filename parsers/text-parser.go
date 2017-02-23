@@ -111,7 +111,10 @@ func SDepartmentOptions() (string, map[string]string, error) {
 	r, _ = regexp.Compile(`<option value="(.*?)">`)
 	options := r.FindAllStringSubmatch(departments, -1)
 	deptOptions := make(map[string]string, 0)
-	for _, option := range options {
+	for i, option := range options {
+		if i == 0 {
+			continue
+		}
 		opt := html.UnescapeString(option[1])
 		key := strings.Replace(strings.ToUpper(opt), " ", "", -1)
 		deptOptions[key] = opt
