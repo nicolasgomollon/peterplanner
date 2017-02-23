@@ -154,12 +154,12 @@ func parse(doc *etree.Document) {
 	
 	offered := make(map[string]bool, 0)
 	// TODO: Where to pull current `yearTerm`?
-	// yearTerm := parsers.SpringQuarter(parsers.YearSQ())
+	yearTerm := parsers.SpringQuarter(parsers.YearSQ())
 	// TODO: What to do with `toCheck->courseNums`?
 	for dept, _ := range toCheck {
 		dir := strings.Replace(dept, "/", "_", -1)
 		// TODO: In production, we'd probably fetch these details from a pre-parsed JSON file.
-		b, err := ioutil.ReadFile(fmt.Sprintf("/var/www/registrar/%v/soc_%v.txt", dir, "2017-14"))
+		b, err := ioutil.ReadFile(fmt.Sprintf("/var/www/registrar/%v/soc_%v.txt", dir, yearTerm))
 		if err != nil {
 			panic(err)
 		}
@@ -177,7 +177,7 @@ func parse(doc *etree.Document) {
 					course := student.Courses[option]
 					fmt.Printf("  %v %v: %v\n", course.Department, course.Number, course.Title)
 					for _, class := range course.Classes {
-						fmt.Printf("    `%v` `%v` `%v` `%v` `%v` `%v` `%v`\n", class.Code, class.Type, class.Section, class.Instructor, class.Days, class.Time, class.Place)
+						fmt.Printf("    %v %v %v %v\n", class.Code, class.Type, class.Section, class.Instructor)
 					}
 				}
 			}
@@ -222,8 +222,7 @@ func main() {
 		
 		readFromString(responseXML)
 	} else if len(*studentIDptr) > 0 {
-		filepath := fmt.Sprintf("/var/www/reports/DGW_Report-%v.xsl", *studentIDptr)
-		readFromFile(filepath)
+		readFromFile(fmt.Sprintf("/var/www/reports/DGW_Report-%v.xsl", *studentIDptr))
 	} else {
 		fmt.Println("No flags were specified. Use `-h` or `--help` flags to get help.")
 	}
