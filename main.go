@@ -1,14 +1,13 @@
 package main
 
 import (
-	// "encoding/json"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"github.com/beevik/etree"
 	"github.com/nicolasgomollon/peterplanner/helpers"
 	"github.com/nicolasgomollon/peterplanner/parsers"
-	"github.com/nicolasgomollon/peterplanner/types"
 	"golang.org/x/net/html/charset"
 	"html"
 	"io/ioutil"
@@ -100,22 +99,22 @@ func fetchBasicXML(studentID string, cookie string) (string, error) {
 	return responseXML, nil
 }
 
-func readFromString(contentsXML string) {
+func readFromString(contentsXML string, outputJSON bool) {
 	doc := etree.NewDocument()
 	doc.ReadSettings.CharsetReader = charset.NewReaderLabel
 	if err := doc.ReadFromString(contentsXML); err != nil {
 		panic(err)
 	}
-	parse(doc)
+	parse(doc, outputJSON)
 }
 
-func readFromFile(fileName string) {
+func readFromFile(fileName string, outputJSON bool) {
 	doc := etree.NewDocument()
 	doc.ReadSettings.CharsetReader = charset.NewReaderLabel
 	if err := doc.ReadFromFile(fileName); err != nil {
 		panic(err)
 	}
-	parse(doc)
+	parse(doc, outputJSON)
 }
 
 type File struct {
@@ -138,7 +137,7 @@ func schedulesFor(deptPath string, termsMap *map[string]bool) []File {
 	return files
 }
 
-func parse(doc *etree.Document) {
+func parse(doc *etree.Document, outputJSON bool) {
 	student, prereqDepts := parsers.Parse(doc)
 	for dept, _ := range prereqDepts {
 		dir := strings.Replace(dept, "/", "_", -1)
@@ -150,45 +149,27 @@ func parse(doc *etree.Document) {
 		parsers.ParsePrerequisites(responseHTML, &student.Courses)
 	}
 	
-	// fmt.Println("Cleared Courses:")
-	canTake := make([]types.Course, 0)
-	toCheck := make(map[string][]string, 0)
+	termsMap := make(map[string]bool, 0)
+	checked := make(map[string]bool, 0)
 	for _, block := range student.Blocks {
-		// fmt.Printf("%v: %v\n", block.ReqType, block.Title)
 		for _, req := range block.Requirements {
-			// fmt.Printf("- %d classes remaining in:\n", req.Required)
 			for _, option := range req.Options {
 				course := student.Courses[option]
-				if course.ClearedPrereqs(student) {
-					// fmt.Printf("  %v %v\n", course.Department, course.Number)
-					
-					courseNums := toCheck[course.Department]
-					if courseNums == nil {
-						courseNums = make([]string, 0)
+				if !checked[course.Department] {
+					dir := strings.Replace(course.Department, "/", "_", -1)
+					deptPath := fmt.Sprintf("/var/www/registrar/%v/", dir)
+					files := schedulesFor(deptPath, &termsMap)
+					for _, file := range files {
+						b, err := ioutil.ReadFile(deptPath + file.Name)
+						if err != nil {
+							panic(err)
+						}
+						responseTXT := string(b)
+						parsers.ParseWebSOC(file.Term, responseTXT, &student.Courses)
 					}
-					courseNums = append(courseNums, course.Number)
-					toCheck[course.Department] = courseNums
-					
-					canTake = append(canTake, course)
+					checked[course.Department] = true
 				}
-				// fmt.Printf("    %v: %v\n", course.Title)
 			}
-		}
-	}
-	
-	termsMap := make(map[string]bool, 0)
-	// TODO: What to do with `toCheck->courseNums`?
-	for dept, _ := range toCheck {
-		dir := strings.Replace(dept, "/", "_", -1)
-		deptPath := fmt.Sprintf("/var/www/registrar/%v/", dir)
-		files := schedulesFor(deptPath, &termsMap)
-		for _, file := range files {
-			b, err := ioutil.ReadFile(deptPath + file.Name)
-			if err != nil {
-				panic(err)
-			}
-			responseTXT := string(b)
-			parsers.ParseWebSOC(file.Term, responseTXT, &student.Courses)
 		}
 	}
 	
@@ -202,54 +183,56 @@ func parse(doc *etree.Document) {
 	student.Terms = terms
 	yearTerm := terms[0]
 	
-	for _, block := range student.Blocks {
-		fmt.Printf("%v: %v\n", block.ReqType, block.Title)
-		for _, req := range block.Requirements {
-			fmt.Printf("- %d classes remaining in:\n", req.Required)
-			for _, option := range req.Options {
-				course := student.Courses[option]
-				termsOffered := make(map[string][]int, 0)
-				for k := range course.Classes {
-					t := "--"
-					switch {
-					case parsers.IsFQ(k):
-						t = "F"
-					case parsers.IsWQ(k):
-						t = "W"
-					case parsers.IsSQ(k):
-						t = "S"
+	if !outputJSON {
+		for _, block := range student.Blocks {
+			fmt.Printf("%v: %v\n", block.ReqType, block.Title)
+			for _, req := range block.Requirements {
+				fmt.Printf("- %d classes remaining in:\n", req.Required)
+				for _, option := range req.Options {
+					course := student.Courses[option]
+					termsOffered := make(map[string][]int, 0)
+					for k := range course.Classes {
+						t := "--"
+						switch {
+						case parsers.IsFQ(k):
+							t = "F"
+						case parsers.IsWQ(k):
+							t = "W"
+						case parsers.IsSQ(k):
+							t = "S"
+						}
+						y, _ := strconv.Atoi(k[0:4])
+						years := termsOffered[t]
+						if years == nil {
+							years = make([]int, 0)
+						}
+						years = append(years, y)
+						termsOffered[t] = years
 					}
-					y, _ := strconv.Atoi(k[0:4])
-					years := termsOffered[t]
-					if years == nil {
-						years = make([]int, 0)
+					cleared := course.ClearedPrereqs(&student)
+					icon := "✗"
+					if cleared {
+						icon = "✓"
 					}
-					years = append(years, y)
-					termsOffered[t] = years
-				}
-				cleared := course.ClearedPrereqs(student)
-				icon := "✗"
-				if cleared {
-					icon = "✓"
-				}
-				
-				fmt.Printf("%-35s   offered: %v\n", fmt.Sprintf("%v %v %v: %v", icon, course.Department, course.Number, course.Title), termsOffered)
-				if cleared {
-					for _, class := range course.Classes[yearTerm] {
-						fmt.Printf("    %v %v %v %v\n", class.Code, class.Type, class.Section, class.Instructor)
+					
+					fmt.Printf("%-35s   offered: %v\n", fmt.Sprintf("%v %v %v: %v", icon, course.Department, course.Number, course.Title), termsOffered)
+					if cleared {
+						for _, class := range course.Classes[yearTerm] {
+							fmt.Printf("    %v %v %v %v\n", class.Code, class.Type, class.Section, class.Instructor)
+						}
+					} else {
+						printArray(course.Prerequisites)
 					}
-				} else {
-					printArray(course.Prerequisites)
 				}
 			}
 		}
+	} else {
+		exportJSON, err := json.Marshal(student)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(string(exportJSON))
 	}
-	
-	// exportJSON, err := json.Marshal(student)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// fmt.Println(string(exportJSON))
 }
 
 func printArray(prereqs [][]string) {
@@ -269,6 +252,7 @@ func printArray(prereqs [][]string) {
 func main() {
 	studentIDptr := flag.String("studentID", "", "Fetch DegreeWorks XML file for the specified student ID.")
 	cookiePtr := flag.String("cookie", "", "Fetch DegreeWorks XML file using specified cookies.")
+	jsonPtr := flag.Bool("json", false, "Output the result in JSON format.")
 	flag.Parse()
 
 	if len(*cookiePtr) > 0 {
@@ -295,9 +279,9 @@ func main() {
 		// 	panic(err)
 		// }
 		
-		readFromString(responseXML)
+		readFromString(responseXML, *jsonPtr)
 	} else if len(*studentIDptr) > 0 {
-		readFromFile(fmt.Sprintf("/var/www/reports/DGW_Report-%v.xsl", *studentIDptr))
+		readFromFile(fmt.Sprintf("/var/www/reports/DGW_Report-%v.xsl", *studentIDptr), *jsonPtr)
 	} else {
 		fmt.Println("No flags were specified. Use `-h` or `--help` flags to get help.")
 	}

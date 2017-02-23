@@ -133,19 +133,19 @@ func (course Course) Key() string {
 	return strings.Replace(strings.ToUpper(course.Department + course.Number), " ", "", -1)
 }
 
-func (course Course) ClearedPrereqs(student Student) bool {
+func (course Course) ClearedPrereqs(student *Student) bool {
 	for _, prereqsAND := range course.Prerequisites {
 		satisfied := false
 		for _, prereqOR := range prereqsAND {
 			if !satisfied {
 				splitPrrq := strings.Split(prereqOR, "|")
 				prereq := strings.Replace(splitPrrq[0], " ", "", -1)
-				satisfied = student.Taken[prereq]
+				satisfied = (*student).Taken[prereq]
 				if !satisfied && strings.HasPrefix(splitPrrq[0], "NO ") {
 					prereq = strings.TrimPrefix(prereq, "NO")
-					satisfied = !student.Taken[prereq]
+					satisfied = !(*student).Taken[prereq]
 				} else if satisfied && (len(splitPrrq) == 2) {
-					c := student.Courses[prereq]
+					c := (*student).Courses[prereq]
 					grade := splitPrrq[1]
 					if (len(c.Grade) != 0) && (len(grade) != 0) {
 						if cmpGrade(c.Grade, grade) > 0 {
