@@ -16,7 +16,7 @@ import (
 /* WebSOC Prerequisites HTML Parser */
 
 const PrereqsURL = "https://www.reg.uci.edu/cob/prrqcgi"
-const PrereqsFormatURL = "https://www.reg.uci.edu/cob/prrqcgi?dept=%v&action=view_by_term&term=%v"
+const PrereqsFormatURL = "https://www.reg.uci.edu/cob/prrqcgi?dept=%v&action=view_all&term=%v"
 
 func PDepartmentOptions() (string, map[string]string, error) {
 	statusCode, responseHTML, err := helpers.Get(PrereqsURL)
