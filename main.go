@@ -202,7 +202,6 @@ func parse(doc *etree.Document) {
 	student.Terms = terms
 	yearTerm := terms[0]
 	
-	fmt.Println("Cleared Courses:")
 	for _, block := range student.Blocks {
 		fmt.Printf("%v: %v\n", block.ReqType, block.Title)
 		for _, req := range block.Requirements {
@@ -228,9 +227,18 @@ func parse(doc *etree.Document) {
 					years = append(years, y)
 					termsOffered[t] = years
 				}
-				fmt.Printf("  %v %v: %v     offered: %v\n", course.Department, course.Number, course.Title, termsOffered)
-				for _, class := range course.Classes[yearTerm] {
-					fmt.Printf("    %v %v %v %v\n", class.Code, class.Type, class.Section, class.Instructor)
+				cleared := course.ClearedPrereqs(student)
+				icon := "✗"
+				if cleared {
+					icon = "✓"
+				}
+				fmt.Printf("%v %v %v: %v     offered: %v\n", icon, course.Department, course.Number, course.Title, termsOffered)
+				if cleared {
+					for _, class := range course.Classes[yearTerm] {
+						fmt.Printf("    %v %v %v %v\n", class.Code, class.Type, class.Section, class.Instructor)
+					}
+				} else {
+					printArray(course.Prerequisites)
 				}
 			}
 		}
@@ -241,6 +249,20 @@ func parse(doc *etree.Document) {
 	// 	panic(err)
 	// }
 	// fmt.Println(string(exportJSON))
+}
+
+func printArray(prereqs [][]string) {
+	for i, prereqInter := range prereqs {
+		spaces := "    "
+		sep := ","
+		if i == (len(prereqs) - 1) {
+			sep = ""
+		}
+		
+		fmt.Printf("%s[\"", spaces)
+		fmt.Printf(strings.Join(prereqInter, "\", \""))
+		fmt.Printf("\"]%s\n", sep)
+	}
 }
 
 func main() {
