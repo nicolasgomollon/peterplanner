@@ -200,6 +200,9 @@ func ParseWebSOC(yearTerm, responseTXT string, courses *map[string]types.Course,
 			if len(line) == 0 {
 				// Empty line.
 				continue
+			} else if (len(line) > 4) && (line == "       _________________________________________________________________") {
+				// Reached the end of the department classes. What continues are typically LARC classes.
+				break
 			} else if (len(line) > 4) && (line[0:4] == "*** ") {
 				// Reached the end of the readable file.
 				break
