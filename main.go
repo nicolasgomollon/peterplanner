@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -176,7 +177,6 @@ func parse(doc *etree.Document) {
 	}
 	
 	termsMap := make(map[string]bool, 0)
-	offered := make(map[string]bool, 0)
 	// TODO: What to do with `toCheck->courseNums`?
 	for dept, _ := range toCheck {
 		dir := strings.Replace(dept, "/", "_", -1)
@@ -188,7 +188,7 @@ func parse(doc *etree.Document) {
 				panic(err)
 			}
 			responseTXT := string(b)
-			parsers.ParseWebSOC(file.Term, responseTXT, &student.Courses, &offered)
+			parsers.ParseWebSOC(file.Term, responseTXT, &student.Courses)
 		}
 	}
 	
@@ -202,23 +202,35 @@ func parse(doc *etree.Document) {
 	student.Terms = terms
 	yearTerm := terms[0]
 	
-	fmt.Println("Offered Courses:")
+	fmt.Println("Cleared Courses:")
 	for _, block := range student.Blocks {
 		fmt.Printf("%v: %v\n", block.ReqType, block.Title)
 		for _, req := range block.Requirements {
 			fmt.Printf("- %d classes remaining in:\n", req.Required)
 			for _, option := range req.Options {
-				if offered[option] {
-					course := student.Courses[option]
-					termsOffered := make(map[string]int, 0)
-					for k := range course.Classes {
-						t := k[5:]
-						termsOffered[t]++
+				course := student.Courses[option]
+				termsOffered := make(map[string][]int, 0)
+				for k := range course.Classes {
+					t := "--"
+					switch {
+					case parsers.IsFQ(k):
+						t = "F"
+					case parsers.IsWQ(k):
+						t = "W"
+					case parsers.IsSQ(k):
+						t = "S"
 					}
-					fmt.Printf("  %v %v: %v   offered: %v\n", course.Department, course.Number, course.Title, termsOffered)
-					for _, class := range course.Classes[yearTerm] {
-						fmt.Printf("    %v %v %v %v\n", class.Code, class.Type, class.Section, class.Instructor)
+					y, _ := strconv.Atoi(k[0:4])
+					years := termsOffered[t]
+					if years == nil {
+						years = make([]int, 0)
 					}
+					years = append(years, y)
+					termsOffered[t] = years
+				}
+				fmt.Printf("  %v %v: %v     offered: %v\n", course.Department, course.Number, course.Title, termsOffered)
+				for _, class := range course.Classes[yearTerm] {
+					fmt.Printf("    %v %v %v %v\n", class.Code, class.Type, class.Section, class.Instructor)
 				}
 			}
 		}
