@@ -13,6 +13,7 @@ import (
 func Parse(doc *etree.Document) (types.Student, map[string]bool) {
 	courses := make(map[string]types.Course, 0)
 	taken := make(map[string]bool, 0)
+	enrolled := make(map[string]string, 0)
 	blocks := make([]types.Block, 0)
 	prereqDepts := make(map[string]bool, 0)
 	
@@ -22,6 +23,30 @@ func Parse(doc *etree.Document) (types.Student, map[string]bool) {
 	name := audit.SelectAttrValue("Stu_name", "ANTEATER, PETER THE")
 	email := audit.SelectAttrValue("Stu_email", "PTANTEATER@UCI.EDU")
 	student := types.Student{StudentID: studentID, Name: name, Email: email}
+	
+	activeTerm := ""
+	deginfo := root.SelectElement("Deginfo")
+	if deginfo != nil {
+		degreeData := deginfo.SelectElement("DegreeData")
+		if degreeData != nil {
+			activeTerm = degreeData.SelectAttrValue("Actv_term", "")
+		}
+	}
+	
+	clsinfo := root.SelectElement("Clsinfo")
+	if clsinfo != nil {
+		for _, class := range clsinfo.SelectElements("Class") {
+			cDept := class.SelectAttrValue("Discipline", "DEPT")
+			cNum := class.SelectAttrValue("Number", "0")
+			cTitle := class.SelectAttrValue("Course_title", "")
+			cTerm := class.SelectAttrValue("Term", "")
+			cInProgress := class.SelectAttrValue("In_progress", "N")
+			key := strings.Replace(strings.ToUpper(cDept + cNum), " ", "", -1)
+			if (cInProgress == "Y") && (cTerm > activeTerm) {
+				enrolled[key] = cTitle
+			}
+		}
+	}
 	
 	for _, block := range root.SelectElements("Block") {
 		reqType := block.SelectAttrValue("Req_type", "unknown")
@@ -46,7 +71,7 @@ func Parse(doc *etree.Document) (types.Student, map[string]bool) {
 			parseProgram(block, &courses, &taken, &blocks, &prereqDepts)
 			break
 		case "MAJOR", "MINOR":
-			parseBlock(block, &courses, &taken, &blocks, &prereqDepts)
+			parseBlock(block, &courses, &taken, &enrolled, &blocks, &prereqDepts)
 			break
 		default:
 			break
@@ -64,43 +89,75 @@ func parseProgram(block *etree.Element, courses *map[string]types.Course, taken 
 	// TODO: Parse for things like "LOWER DIVISION WRITING" and "UPPER DIVISION WRITING"
 }
 
-func parseBlock(block *etree.Element, courses *map[string]types.Course, taken *map[string]bool, blocks *[]types.Block, prereqDepts *map[string]bool) {
-	requirements := make([]types.Requirement, 0)
-	for _, rule := range block.SelectElements("Rule") {
-		rules := rule.SelectElements("Rule")
-		if len(rules) > 0 {
-			// TODO: Need to determine how to handle this case, because only certain rule blocks may be necessary.
-			for _, r := range rules {
-				parseRule(r, courses, taken, prereqDepts, &requirements)
+func parseBlock(block *etree.Element, courses *map[string]types.Course, taken *map[string]bool, enrolled *map[string]string, blocks *[]types.Block, prereqDepts *map[string]bool) {
+	rules := make([]types.Rule, 0)
+	for _, r := range block.SelectElements("Rule") {
+		label := r.SelectAttrValue("Label", "")
+		rs := r.SelectElements("Rule")
+		if len(rs) > 0 {
+			req := r.SelectElement("Requirement")
+			required, _ := strconv.Atoi(req.SelectAttrValue("NumGroups", "0"))
+			rule := types.Rule{Label: label, Required: required}
+			requirements := make([]types.Requirement, 0)
+			for _, r2 := range rs {
+				requirement := parseRule(r2, courses, taken, enrolled, prereqDepts)
+				requirements = append(requirements, requirement)
 			}
+			rule.Requirements = requirements
+			rules = append(rules, rule)
 		} else {
-			parseRule(rule, courses, taken, prereqDepts, &requirements)
+			rule := types.Rule{Label: label, Required: 1}
+			requirements := make([]types.Requirement, 0)
+			requirement := parseRule(r, courses, taken, enrolled, prereqDepts)
+			requirements = append(requirements, requirement)
+			rule.Requirements = requirements
+			rules = append(rules, rule)
 		}
 	}
 	reqType := block.SelectAttrValue("Req_type", "UNKNOWN")
 	title := block.SelectAttrValue("Title", "Untitled")
-	theBlock := types.Block{ReqType: reqType, Title: title, Requirements: requirements}
+	theBlock := types.Block{ReqType: reqType, Title: title, Rules: rules}
 	*blocks = append(*blocks, theBlock)
 }
 
-func parseRule(rule *etree.Element, courses *map[string]types.Course, taken *map[string]bool, prereqDepts *map[string]bool, requirements *[]types.Requirement) {
+func parseRule(rule *etree.Element, courses *map[string]types.Course, taken *map[string]bool, enrolled *map[string]string, prereqDepts *map[string]bool) types.Requirement {
+	requirement := types.Requirement{}
+	options := make([]string, 0)
+	
+	// Required Classes
+	requirementBlock := rule.SelectElement("Requirement")
+	if requirementBlock != nil {
+		required, _ := strconv.Atoi(requirementBlock.SelectAttrValue("Classes_begin", "0"))
+		requirement.Required = required
+		for _, course := range requirementBlock.SelectElements("Course") {
+			cDept := course.SelectAttrValue("Disc", "DEPT")
+			cNum := course.SelectAttrValue("Num", "0")
+			
+			c := types.Course{Department: cDept, Number: cNum}
+			key := c.Key()
+			(*courses)[key] = c
+			(*prereqDepts)[strings.ToUpper(c.Department)] = true
+			options = append(options, key)
+		}
+	}
+	
 	// Remaining Classes
 	advice := rule.SelectElement("Advice")
 	if advice != nil {
-		required, _ := strconv.Atoi(advice.SelectAttrValue("Classes", "0"))
-		options := make([]string, 0)
+		// TODO: Do we want the current number of courses left for the rule, or the static requirement?
+		// required, _ := strconv.Atoi(advice.SelectAttrValue("Classes", "0"))
+		// requirement.Required = required
 		for _, course := range advice.SelectElements("Course") {
 			cDept := course.SelectAttrValue("Disc", "DEPT")
 			cNum := course.SelectAttrValue("Num", "0")
 			cTitle := course.SelectAttrValue("Title", "")
 			
-			course := types.Course{Department: cDept, Number: cNum, Title: cTitle}
-			(*courses)[course.Key()] = course
-			(*prereqDepts)[strings.ToUpper(course.Department)] = true
-			options = append(options, course.Key())
+			key := strings.Replace(strings.ToUpper(cDept + cNum), " ", "", -1)
+			if c, ok := (*courses)[key]; ok {
+				c.Title = cTitle
+				(*courses)[key] = c
+			}
 		}
-		requirement := types.Requirement{Required: required, Options: options}
-		*requirements = append(*requirements, requirement)
 	}
 	
 	// Taken Classes
@@ -111,9 +168,23 @@ func parseRule(rule *etree.Element, courses *map[string]types.Course, taken *map
 			cNum := course.SelectAttrValue("Number", "0")
 			cGrade := course.SelectAttrValue("Letter_grade", "")
 			
-			course := types.Course{Department: cDept, Number: cNum, Grade: cGrade}
-			(*courses)[course.Key()] = course
-			(*taken)[course.Key()] = true
+			c := types.Course{Department: cDept, Number: cNum}
+			key := c.Key()
+			
+			if cGrade != "IP" {
+				c.Grade = cGrade
+				(*taken)[key] = true
+			} else if cTitle, ok := (*enrolled)[key]; ok {
+				c.Title = cTitle
+				// (*prereqDepts)[strings.ToUpper(c.Department)] = true
+				// requirement.Required++
+			} else {
+				(*taken)[key] = true
+			}
+			(*courses)[key] = c
 		}
 	}
+	
+	requirement.Options = options
+	return requirement
 }

@@ -179,10 +179,43 @@ type Requirement struct {
 	Options  []string `json:"options"`
 }
 
-type Block struct {
-	ReqType      string        `json:"type"`
-	Title        string        `json:"title"`
+func (req Requirement) IsCompleted(student *Student) bool {
+	takenCount := 0
+	for _, option := range req.Options {
+		course := (*student).Courses[option]
+		if (*student).Taken[course.Key()] {
+			takenCount++
+			if takenCount >= req.Required {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+type Rule struct {
+	Label        string        `json:"label"`
+	Required     int           `json:"required"`
 	Requirements []Requirement `json:"requirements"`
+}
+
+func (rule Rule) IsCompleted(student *Student) bool {
+	completedCount := 0
+	for _, req := range rule.Requirements {
+		if req.IsCompleted(student) {
+			completedCount++
+			if completedCount >= rule.Required {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+type Block struct {
+	ReqType string `json:"type"`
+	Title   string `json:"title"`
+	Rules   []Rule `json:"rules"`
 }
 
 type Student struct {

@@ -155,22 +155,24 @@ func parse(doc *etree.Document, outputJSON bool) {
 	termsMap := make(map[string]bool, 0)
 	checked := make(map[string]bool, 0)
 	for _, block := range student.Blocks {
-		for _, req := range block.Requirements {
-			for _, option := range req.Options {
-				course := student.Courses[option]
-				if !checked[course.Department] {
-					dir := strings.Replace(course.Department, "/", "_", -1)
-					deptPath := fmt.Sprintf("/var/www/registrar/%v/", dir)
-					files := schedulesFor(deptPath, &termsMap)
-					for _, file := range files {
-						b, err := ioutil.ReadFile(deptPath + file.Name)
-						if err != nil {
-							panic(err)
+		for _, rule := range block.Rules {
+			for _, req := range rule.Requirements {
+				for _, option := range req.Options {
+					course := student.Courses[option]
+					if !checked[course.Department] {
+						dir := strings.Replace(course.Department, "/", "_", -1)
+						deptPath := fmt.Sprintf("/var/www/registrar/%v/", dir)
+						files := schedulesFor(deptPath, &termsMap)
+						for _, file := range files {
+							b, err := ioutil.ReadFile(deptPath + file.Name)
+							if err != nil {
+								panic(err)
+							}
+							responseTXT := string(b)
+							parsers.ParseWebSOC(file.Term, responseTXT, &student.Courses)
 						}
-						responseTXT := string(b)
-						parsers.ParseWebSOC(file.Term, responseTXT, &student.Courses)
+						checked[course.Department] = true
 					}
-					checked[course.Department] = true
 				}
 			}
 		}
@@ -189,42 +191,56 @@ func parse(doc *etree.Document, outputJSON bool) {
 	if !outputJSON {
 		for _, block := range student.Blocks {
 			fmt.Printf("%v: %v\n", block.ReqType, block.Title)
-			for _, req := range block.Requirements {
-				fmt.Printf("- %d classes remaining in:\n", req.Required)
-				for _, option := range req.Options {
-					course := student.Courses[option]
-					termsOffered := make(map[string][]int, 0)
-					for k := range course.Classes {
-						t := "--"
-						switch {
-						case parsers.IsFQ(k):
-							t = "F"
-						case parsers.IsWQ(k):
-							t = "W"
-						case parsers.IsSQ(k):
-							t = "S"
-						}
-						y, _ := strconv.Atoi(k[0:4])
-						years := termsOffered[t]
-						if years == nil {
-							years = make([]int, 0)
-						}
-						years = append(years, y)
-						termsOffered[t] = years
+			for _, rule := range block.Rules {
+				if rule.IsCompleted(&student) {
+					fmt.Printf("✓ %v\n", rule.Label)
+					continue
+				}
+				if (rule.Required == 1) && (len(rule.Requirements) == 1) {
+					fmt.Printf("- %v\n", rule.Label)
+				} else {
+					fmt.Printf("- %v (%v)\n", rule.Label, rule.Required)
+				}
+				for _, req := range rule.Requirements {
+					if req.IsCompleted(&student) {
+						continue
 					}
-					cleared := course.ClearedPrereqs(&student)
-					icon := "✗"
-					if cleared {
-						icon = "✓"
-					}
-					
-					fmt.Printf("%-35s   offered: %v\n", fmt.Sprintf("%v %v %v: %v", icon, course.Department, course.Number, course.Title), termsOffered)
-					if cleared {
-						for _, class := range course.Classes[yearTerm] {
-							fmt.Printf("    %v %v %v %v\n", class.Code, class.Type, class.Section, class.Instructor)
+					fmt.Printf("    - %d classes remaining in:\n", req.Required)
+					for _, option := range req.Options {
+						course := student.Courses[option]
+						termsOffered := make(map[string][]int, 0)
+						for k := range course.Classes {
+							t := "--"
+							switch {
+							case parsers.IsFQ(k):
+								t = "F"
+							case parsers.IsWQ(k):
+								t = "W"
+							case parsers.IsSQ(k):
+								t = "S"
+							}
+							y, _ := strconv.Atoi(k[0:4])
+							years := termsOffered[t]
+							if years == nil {
+								years = make([]int, 0)
+							}
+							years = append(years, y)
+							termsOffered[t] = years
 						}
-					} else {
-						printArray(course.Prerequisites)
+						cleared := course.ClearedPrereqs(&student)
+						icon := "✗"
+						if cleared {
+							icon = "✓"
+						}
+						
+						fmt.Printf("        %-35s   offered: %v\n", fmt.Sprintf("%v %v %v: %v", icon, course.Department, course.Number, course.Title), termsOffered)
+						if cleared {
+							for _, class := range course.Classes[yearTerm] {
+								fmt.Printf("            %v %v %v %v\n", class.Code, class.Type, class.Section, class.Instructor)
+							}
+						} else {
+							printArray(course.Prerequisites)
+						}
 					}
 				}
 			}
@@ -240,7 +256,7 @@ func parse(doc *etree.Document, outputJSON bool) {
 
 func printArray(prereqs [][]string) {
 	for i, prereqInter := range prereqs {
-		spaces := "    "
+		spaces := "            "
 		sep := ","
 		if i == (len(prereqs) - 1) {
 			sep = ""
