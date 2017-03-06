@@ -1,11 +1,13 @@
 package main
 
 import (
+	"crypto/sha1"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"github.com/beevik/etree"
+	"github.com/nicolasgomollon/peterplanner/database"
 	"github.com/nicolasgomollon/peterplanner/helpers"
 	"github.com/nicolasgomollon/peterplanner/parsers"
 	"golang.org/x/net/html/charset"
@@ -19,6 +21,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const DegreeWorksURL = "https://www.reg.uci.edu/dgw/IRISLink.cgi"
@@ -250,6 +253,7 @@ func printArray(prereqs [][]string) {
 }
 
 func main() {
+	uidPtr := flag.String("uid", "", "Fetch DegreeWorks XML file for the specified uid.")
 	studentIDptr := flag.String("studentID", "", "Fetch DegreeWorks XML file for the specified student ID.")
 	cookiePtr := flag.String("cookie", "", "Fetch DegreeWorks XML file using specified cookies.")
 	jsonPtr := flag.Bool("json", false, "Output the result in JSON format.")
@@ -264,6 +268,26 @@ func main() {
 			*studentIDptr = studentID
 		}
 		
+		db, err := helpers.DatabaseFromFile("/var/www/config/settings.json")
+		dbConn, err := database.Connect(db)
+		if err != nil {
+			panic(errors.New(fmt.Sprintf("ERROR: Could not create new database connection. `%v`.", err.Error())))
+		}
+		
+		studentExists, uid, err := database.RowExists(dbConn, "SELECT `uid` FROM `accounts` WHERE `studentID`=? LIMIT 1", *studentIDptr)
+		if !studentExists && (err == nil) {
+			timestamp := time.Now().Format(time.RFC3339)
+			uid = fmt.Sprintf("%v|%v", *studentIDptr, timestamp)
+			h := sha1.New()
+			h.Write([]byte(uid))
+			bs := h.Sum(nil)
+			uid = fmt.Sprintf("%x", bs)
+			_, err = database.Execute(dbConn, "INSERT INTO `accounts` SET `uid`=?, `studentID`=?", uid, *studentIDptr)
+			if err != nil {
+				panic(err)
+			}
+		}
+		
 		school, degree, degreeName, studentLevel, studentMajor, err := fetchStudentDetails(*studentIDptr, *cookiePtr)
 		if err != nil {
 			panic(err)
@@ -274,12 +298,33 @@ func main() {
 			panic(err)
 		}
 		
-		// responseXML, err := fetchBasicXML(*studentIDptr, *cookiePtr)
-		// if err != nil {
-		// 	panic(err)
-		// }
+		filepath := fmt.Sprintf("/var/www/reports/DGW_Report-%v.xsl", *studentIDptr)
+		err = ioutil.WriteFile(filepath, []byte(responseXML), 0644)
+		if err != nil {
+			panic(err)
+		}
 		
-		readFromString(responseXML, *jsonPtr)
+		output := make(map[string]string, 0)
+		output["uid"] = uid
+		
+		exportJSON, err := json.Marshal(output)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(string(exportJSON))
+	} else if len(*uidPtr) > 0 {
+		db, err := helpers.DatabaseFromFile("/var/www/config/settings.json")
+		dbConn, err := database.Connect(db)
+		if err != nil {
+			panic(errors.New(fmt.Sprintf("ERROR: Could not create new database connection. `%v`.", err.Error())))
+		}
+		
+		studentExists, studentID, _ := database.RowExists(dbConn, "SELECT `studentID` FROM `accounts` WHERE `uid`=? LIMIT 1", *uidPtr)
+		if studentExists {
+			readFromFile(fmt.Sprintf("/var/www/reports/DGW_Report-%v.xsl", studentID), *jsonPtr)
+		} else {
+			fmt.Println("{}")
+		}
 	} else if len(*studentIDptr) > 0 {
 		readFromFile(fmt.Sprintf("/var/www/reports/DGW_Report-%v.xsl", *studentIDptr), *jsonPtr)
 	} else {
