@@ -77,7 +77,7 @@ func ParsePrerequisites(responseHTML string, courses *map[string]types.Course) {
 					kp = strings.ToUpper(clean(matches[2]))
 					kp = strings.Replace(kp, " ", "", -1)
 				} else {
-					k = strings.ToUpper(element)
+					k = strings.ToUpper(clean(element))
 					k = strings.Replace(k, " ", "", -1)
 				}
 				break
