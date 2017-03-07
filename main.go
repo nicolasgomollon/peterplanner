@@ -202,7 +202,7 @@ func parse(doc *etree.Document, outputJSON bool) {
 					fmt.Printf("- %v (%v)\n", rule.Label, rule.Required)
 				}
 				for _, req := range rule.Requirements {
-					if req.IsCompleted(&student) {
+					if req.IsCompleted() {
 						continue
 					}
 					fmt.Printf("    - %d classes remaining in:\n", req.Required)

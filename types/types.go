@@ -175,22 +175,13 @@ func (course Course) ClearedPrereqs(student *Student) bool {
 }
 
 type Requirement struct {
-	Required int      `json:"required"`
-	Options  []string `json:"options"`
+	Required  int      `json:"required"`
+	Options   []string `json:"options"`
+	Completed []string `json:"completed"`
 }
 
-func (req Requirement) IsCompleted(student *Student) bool {
-	takenCount := 0
-	for _, option := range req.Options {
-		course := (*student).Courses[option]
-		if (*student).Taken[course.Key()] {
-			takenCount++
-			if takenCount >= req.Required {
-				return true
-			}
-		}
-	}
-	return false
+func (req Requirement) IsCompleted() bool {
+	return len(req.Completed) >= req.Required
 }
 
 type Rule struct {
@@ -202,7 +193,7 @@ type Rule struct {
 func (rule Rule) IsCompleted(student *Student) bool {
 	completedCount := 0
 	for _, req := range rule.Requirements {
-		if req.IsCompleted(student) {
+		if req.IsCompleted() {
 			completedCount++
 			if completedCount >= rule.Required {
 				return true

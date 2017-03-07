@@ -123,6 +123,7 @@ func parseBlock(block *etree.Element, courses *map[string]types.Course, taken *m
 func parseRule(rule *etree.Element, courses *map[string]types.Course, taken *map[string]bool, enrolled *map[string]string, prereqDepts *map[string]bool) types.Requirement {
 	requirement := types.Requirement{}
 	options := make([]string, 0)
+	completed := make([]string, 0)
 	
 	// Required Classes
 	requirementBlock := rule.SelectElement("Requirement")
@@ -174,17 +175,20 @@ func parseRule(rule *etree.Element, courses *map[string]types.Course, taken *map
 			if cGrade != "IP" {
 				c.Grade = cGrade
 				(*taken)[key] = true
+				completed = append(completed, key)
 			} else if cTitle, ok := (*enrolled)[key]; ok {
 				c.Title = cTitle
 				// (*prereqDepts)[strings.ToUpper(c.Department)] = true
 				// requirement.Required++
 			} else {
 				(*taken)[key] = true
+				completed = append(completed, key)
 			}
 			(*courses)[key] = c
 		}
 	}
 	
 	requirement.Options = options
+	requirement.Completed = completed
 	return requirement
 }
