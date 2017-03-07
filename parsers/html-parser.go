@@ -58,34 +58,46 @@ func ParsePrerequisites(responseHTML string, courses *map[string]types.Course) {
 	
 	r, _ = regexp.Compile(`(?s)<td.*?>(.*?)<\/td>`)
 	
+	p, _ := regexp.Compile(`(?s)(.*)<span.*?>\* (.*?) since .*?<\/span>`)
+	
 	for _, prereqSlice := range prereqs {
 		prereq := prereqSlice[1]
 		elements := r.FindAllStringSubmatch(prereq, -1)
-		c := ""
 		k := ""
+		kp := ""
 		t := ""
 		for i, elementMatch := range elements {
 			element := elementMatch[1]
-			element = sanitize.HTML(element)			// Remove HTML tags.
-			element = strings.TrimSpace(element)		// Trim leading and trailing whitespace.
-			s, _ := regexp.Compile(`([\r\n]+[\s\p{Zs}]?|[\s\p{Zs}]{2,})`)
-			element = s.ReplaceAllString(element, " ")	// Replace consecutive spaces with one.
-			element = html.UnescapeString(element)		// Decode HTML entities.
 			switch i {
 			case 0:
-				c = strings.ToUpper(element)
-				k = strings.Replace(c, " ", "", -1)
+				matches := p.FindStringSubmatch(element)
+				if len(matches) > 0 {
+					k = strings.ToUpper(clean(matches[1]))
+					k = strings.Replace(k, " ", "", -1)
+					kp = strings.ToUpper(clean(matches[2]))
+					kp = strings.Replace(kp, " ", "", -1)
+				} else {
+					k = strings.ToUpper(element)
+					k = strings.Replace(k, " ", "", -1)
+				}
 				break
 			case 1:
-				t = element
+				t = clean(element)
 				break
 			case 2:
 				if course, ok := (*courses)[k]; ok {
 					if len(course.Title) == 0 {
 						course.Title = t
 					}
-					course.Prerequisites = parsedPrerequisites(element)
+					course.Prerequisites = parsedPrerequisites(clean(element))
 					(*courses)[k] = course
+				}
+				if course, ok := (*courses)[kp]; ok {
+					if len(course.Title) == 0 {
+						course.Title = t
+					}
+					course.Prerequisites = parsedPrerequisites(clean(element))
+					(*courses)[kp] = course
 				}
 				break
 			default:
@@ -96,6 +108,15 @@ func ParsePrerequisites(responseHTML string, courses *map[string]types.Course) {
 			}
 		}
 	}
+}
+
+func clean(element string) string {
+	element = sanitize.HTML(element)			// Remove HTML tags.
+	element = strings.TrimSpace(element)		// Trim leading and trailing whitespace.
+	s, _ := regexp.Compile(`([\r\n]+[\s\p{Zs}]?|[\s\p{Zs}]{2,})`)
+	element = s.ReplaceAllString(element, " ")	// Replace consecutive spaces with one.
+	element = html.UnescapeString(element)		// Decode HTML entities.
+	return element
 }
 
 func parsedPrerequisites(rawPrereqs string) [][]string {
