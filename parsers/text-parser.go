@@ -151,19 +151,6 @@ func (token Token) Len() int {
 	return token.End + token.Start
 }
 
-// func (subscription Subscription) IsValid() bool {
-// 	currentDate := time.Now()
-// 	return (currentDate.After(subscription.ValidFrom.Time()) || currentDate.Equal(subscription.ValidFrom.Time())) && currentDate.Before(subscription.ExpiresOn.Time())
-// }
-
-// func (subscription Subscription) JSON() (string, error) {
-// 	subscriptionJSON, err := json.Marshal(subscription)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	return string(subscriptionJSON), nil
-// }
-
 func ParseWebSOC(yearTerm, responseTXT string, courses *map[string]types.Course) error {
 	scanner := bufio.NewScanner(strings.NewReader(responseTXT))
 	shouldParse := false
@@ -209,8 +196,8 @@ func ParseWebSOC(yearTerm, responseTXT string, courses *map[string]types.Course)
 			} else if (len(line) > 4) && (len(strings.TrimSpace(line[0:4])) > 0) {
 				// Course information.
 				width = 0
-				cDept = strings.TrimSpace(line[0:8])
-				cNum = strings.TrimSpace(line[9:18])
+				cDept = strings.ToUpper(strings.TrimSpace(line[0:8]))
+				cNum = strings.ToUpper(strings.TrimSpace(line[9:18]))
 				cTitle = line[19:]
 				// fmt.Printf("`%v` `%v` `%v`\n", cDept, cNum, cTitle)
 				continue
@@ -268,10 +255,10 @@ func ParseWebSOC(yearTerm, responseTXT string, courses *map[string]types.Course)
 			class.Place = strings.TrimSpace(line[placeTkn.Start:placeTkn.End])
 			//fmt.Printf("`%v` `%v` `%v` `%v` `%v` `%v` `%v`\n", class.Code, class.Type, class.Section, class.Instructor, class.Days, class.Time, class.Place)
 			
-			k := strings.Replace(strings.ToUpper(cDept + cNum), " ", "", -1)
+			k := strings.Replace(cDept + cNum, " ", "", -1)
 			if course, ok := (*courses)[k]; ok {
-				if len(course.Title) == 0 {
-					course.Title = cTitle
+				if len(course.ShortTitle) == 0 {
+					course.ShortTitle = cTitle
 				}
 				classesMap := course.Classes
 				if classesMap == nil {
@@ -281,6 +268,14 @@ func ParseWebSOC(yearTerm, responseTXT string, courses *map[string]types.Course)
 				if classes == nil {
 					classes = make([]types.Class, 0)
 				}
+				classes = append(classes, class)
+				classesMap[yearTerm] = classes
+				course.Classes = classesMap
+				(*courses)[k] = course
+			} else {
+				course := types.Course{Department: cDept, Number: cNum, ShortTitle: cTitle}
+				classesMap := make(map[string][]types.Class, 0)
+				classes := make([]types.Class, 0)
 				classes = append(classes, class)
 				classesMap[yearTerm] = classes
 				course.Classes = classesMap

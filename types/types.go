@@ -124,6 +124,8 @@ type Course struct {
 	Department    string             `json:"department"`
 	Number        string             `json:"number"`
 	Title         string             `json:"title"`
+	ShortTitle    string             `json:"stitle"`
+	Description   string             `json:"description"`
 	Grade         string             `json:"grade"`
 	Prerequisites [][]string         `json:"prerequisites"`
 	Classes       map[string][]Class `json:"classes"`
@@ -246,4 +248,9 @@ func (student Student) Standing() string {
 		return "LOWER DIVISION"
 	}
 	return ""
+}
+
+type Catalogue struct {
+	Courses map[string]Course `json:"courses"`
+	Terms   []string          `json:"terms"`
 }

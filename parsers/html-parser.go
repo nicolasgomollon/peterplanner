@@ -50,7 +50,11 @@ func FetchPrerequisites(term string, option string) (string, error) {
 }
 
 func ParsePrerequisites(responseHTML string, courses *map[string]types.Course) {
-	r, _ := regexp.Compile(`(?s)<table width="800"(?:[^>]*)>(.*?)<\/table>`)
+	r, _ := regexp.Compile(`(?s)<table border="0">.*?<tr>.*?<td align="center">.*?<h3>(.*?)</h3>.*?</td>`)
+	dept := r.FindStringSubmatch(responseHTML)[1]
+	dept = strings.Replace(strings.ToUpper(dept), " ", "", -1)
+	
+	r, _ = regexp.Compile(`(?s)<table width="800"(?:[^>]*)>(.*?)<\/table>`)
 	rawPrereqs := r.FindStringSubmatch(responseHTML)[1]
 	
 	r, _ = regexp.Compile(`(?s)<tr>(.*?)<\/tr>`)
@@ -86,18 +90,24 @@ func ParsePrerequisites(responseHTML string, courses *map[string]types.Course) {
 				break
 			case 2:
 				if course, ok := (*courses)[k]; ok {
-					if len(course.Title) == 0 {
-						course.Title = t
-					}
+					course.ShortTitle = t
+					course.Prerequisites = parsedPrerequisites(clean(element))
+					(*courses)[k] = course
+				} else if len(dept) < len(k) {
+					course := types.Course{Department: dept, Number: k[len(dept):], ShortTitle: t}
 					course.Prerequisites = parsedPrerequisites(clean(element))
 					(*courses)[k] = course
 				}
-				if course, ok := (*courses)[kp]; ok {
-					if len(course.Title) == 0 {
-						course.Title = t
+				if len(kp) > 0 {
+					if course, ok := (*courses)[kp]; ok {
+						course.ShortTitle = t
+						course.Prerequisites = parsedPrerequisites(clean(element))
+						(*courses)[kp] = course
+					} else if len(dept) < len(kp) {
+						course := types.Course{Department: dept, Number: kp[len(dept):], ShortTitle: t}
+						course.Prerequisites = parsedPrerequisites(clean(element))
+						(*courses)[kp] = course
 					}
-					course.Prerequisites = parsedPrerequisites(clean(element))
-					(*courses)[kp] = course
 				}
 				break
 			default:

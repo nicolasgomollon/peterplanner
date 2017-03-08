@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/nicolasgomollon/peterplanner/helpers"
+	"github.com/nicolasgomollon/peterplanner/types"
 	"net/http"
 	"regexp"
 	"strings"
@@ -42,4 +43,24 @@ func FetchCatalogue(deptURL string) (string, error) {
 		return "", errors.New(fmt.Sprintf("ERROR: Unable to fetch Course Catalogue HTML file. HTTP status code: %v.", statusCode))
 	}
 	return responseHTML, nil
+}
+
+func ParseCatalogue(responseHTML string, courses *map[string]types.Course) {
+	r, _ := regexp.Compile(`<h1>.*? \(([^\(\)]*?)\)</h1>`)
+	dept := r.FindStringSubmatch(responseHTML)[1]
+	dept = strings.Replace(strings.ToUpper(dept), " ", "", -1)
+	
+	r, _ = regexp.Compile(`(?s)<div class="courses">(.*)</div></div>`)
+	coursesBlock := r.FindStringSubmatch(responseHTML)[1]
+	
+	r, _ = regexp.Compile(`(?s)<div class="courseblock">.*?<p class="courseblocktitle"><strong>(.*?)&#160;(.*?)\.\s*(.*?)\..*?</strong></p>.*?<p class="courseblockdesc">.*?<p>(.*?)</p>.*?</div>`)
+	cs := r.FindAllStringSubmatch(coursesBlock, -1)
+	
+	for _, c := range cs {
+		number := c[2]
+		title := c[3]
+		description := c[4]
+		course := types.Course{Department: dept, Number: number, Title: title, Description: description}
+		(*courses)[course.Key()] = course
+	}
 }

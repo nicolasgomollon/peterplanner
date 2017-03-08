@@ -10,15 +10,13 @@ import (
 	"github.com/nicolasgomollon/peterplanner/database"
 	"github.com/nicolasgomollon/peterplanner/helpers"
 	"github.com/nicolasgomollon/peterplanner/parsers"
+	"github.com/nicolasgomollon/peterplanner/types"
 	"golang.org/x/net/html/charset"
 	"html"
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -120,73 +118,25 @@ func readFromFile(fileName string, outputJSON bool) {
 	parse(doc, outputJSON)
 }
 
-type File struct {
-	Name string
-	Term string
-}
-
-func schedulesFor(deptPath string, termsMap *map[string]bool) []File {
-	r, _ := regexp.Compile(`soc_(\d{4}-\d{2})\.txt`)
-	files := make([]File, 0)
-	filepath.Walk(deptPath, func(path string, f os.FileInfo, _ error) error {
-		filename := f.Name()
-		if strings.HasPrefix(filename, "soc_") {
-			term := r.FindStringSubmatch(filename)[1]
-			(*termsMap)[term] = true
-			files = append(files, File{Name: filename, Term: term})
-		}
-		return nil
-	})
-	return files
+func GetCatalogue() (types.Catalogue, error) {
+	b, err := ioutil.ReadFile("/var/www/registrar/catalogue.json")
+	if err != nil {
+		panic(err)
+	}
+	var catalogue types.Catalogue
+	err = json.Unmarshal(b, &catalogue)
+	if err != nil {
+		return types.Catalogue{}, err
+	}
+	return catalogue, nil
 }
 
 func parse(doc *etree.Document, outputJSON bool) {
-	student, prereqDepts := parsers.Parse(doc)
-	for dept, _ := range prereqDepts {
-		dir := strings.Replace(dept, "/", "_", -1)
-		b, err := ioutil.ReadFile(fmt.Sprintf("/var/www/registrar/%v/prereqs.html", dir))
-		if err != nil {
-			panic(err)
-		}
-		responseHTML := string(b)
-		parsers.ParsePrerequisites(responseHTML, &student.Courses)
-	}
+	catalogue, _ := GetCatalogue()
 	
-	termsMap := make(map[string]bool, 0)
-	checked := make(map[string]bool, 0)
-	for _, block := range student.Blocks {
-		for _, rule := range block.Rules {
-			for _, req := range rule.Requirements {
-				for _, option := range req.Options {
-					course := student.Courses[option]
-					if !checked[course.Department] {
-						dir := strings.Replace(course.Department, "/", "_", -1)
-						deptPath := fmt.Sprintf("/var/www/registrar/%v/", dir)
-						files := schedulesFor(deptPath, &termsMap)
-						for _, file := range files {
-							b, err := ioutil.ReadFile(deptPath + file.Name)
-							if err != nil {
-								panic(err)
-							}
-							responseTXT := string(b)
-							parsers.ParseWebSOC(file.Term, responseTXT, &student.Courses)
-						}
-						checked[course.Department] = true
-					}
-				}
-			}
-		}
-	}
-	
-	terms := make([]string, len(termsMap))
-	i := 0
-	for t := range termsMap {
-		terms[i] = t
-		i++
-	}
-	sort.Sort(sort.Reverse(sort.StringSlice(terms)))
-	student.Terms = terms
-	yearTerm := terms[0]
+	student := parsers.Parse(doc, &catalogue)
+	student.Terms = catalogue.Terms
+	yearTerm := student.Terms[0]
 	
 	if !outputJSON {
 		for _, block := range student.Blocks {
