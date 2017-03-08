@@ -69,7 +69,7 @@ func Parse(doc *etree.Document, catalogue *types.Catalogue) types.Student {
 		case "PROGRAM":
 			parseProgram(block, catalogue, &courses, &taken, &blocks)
 			break
-		case "MAJOR", "MINOR":
+		case "MAJOR", "MINOR", "SPEC":
 			parseBlock(block, catalogue, &courses, &taken, &enrolled, &blocks)
 			break
 		default:
@@ -91,6 +91,10 @@ func parseProgram(block *etree.Element, catalogue *types.Catalogue, courses *map
 func parseBlock(block *etree.Element, catalogue *types.Catalogue, courses *map[string]types.Course, taken *map[string]bool, enrolled *map[string]string, blocks *[]types.Block) {
 	rules := make([]types.Rule, 0)
 	for _, r := range block.SelectElements("Rule") {
+		ruleType := block.SelectAttrValue("RuleType", "")
+		if ruleType == "IfStmt" {
+			continue
+		}
 		label := r.SelectAttrValue("Label", "")
 		rs := r.SelectElements("Rule")
 		if len(rs) > 0 {
