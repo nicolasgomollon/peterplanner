@@ -11,91 +11,11 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
-	"time"
 )
 
 /* WebSOC Text Parser */
 
 const WebSocURL = "https://www.reg.uci.edu/perl/WebSoc/"
-
-func IsAcademicTerm(term string) bool {
-	if len(term) == 7 {
-		switch term[5:] {
-		case "92", "03", "14":
-			return true
-		}
-	}
-	return false
-}
-
-func IsFQ(term string) bool {
-	if IsAcademicTerm(term) {
-		return term[5:] == "92"
-	}
-	return false
-}
-
-func IsWQ(term string) bool {
-	if IsAcademicTerm(term) {
-		return term[5:] == "03"
-	}
-	return false
-}
-
-func IsSQ(term string) bool {
-	if IsAcademicTerm(term) {
-		return term[5:] == "14"
-	}
-	return false
-}
-
-func FallQuarter(year int) string {
-	return fmt.Sprintf("%v-92", year)
-}
-
-func WinterQuarter(year int) string {
-	return fmt.Sprintf("%v-03", year)
-}
-
-func SpringQuarter(year int) string {
-	return fmt.Sprintf("%v-14", year)
-}
-
-func YearFQ() int {
-	currentDate := time.Now()
-	year := currentDate.Year()
-	return year
-}
-
-func YearWQ() int {
-	currentDate := time.Now()
-	year := currentDate.Year()
-	month := currentDate.Month()
-	if month > time.June {
-		year++
-	}
-	return year
-}
-
-func YearSQ() int {
-	currentDate := time.Now()
-	year := currentDate.Year()
-	month := currentDate.Month()
-	if month > time.June {
-		year++
-	}
-	return year
-}
-
-func AcademicYear() int {
-	currentDate := time.Now()
-	year := currentDate.Year()
-	month := currentDate.Month()
-	if month <= time.June {
-		year--
-	}
-	return year
-}
 
 func SDepartmentOptions() (string, map[string]string, error) {
 	statusCode, responseHTML, err := helpers.Get(WebSocURL)

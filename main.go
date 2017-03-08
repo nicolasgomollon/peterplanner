@@ -162,11 +162,11 @@ func parse(doc *etree.Document, outputJSON bool) {
 						for k := range course.Classes {
 							t := "--"
 							switch {
-							case parsers.IsFQ(k):
+							case types.IsFQ(k):
 								t = "F"
-							case parsers.IsWQ(k):
+							case types.IsWQ(k):
 								t = "W"
-							case parsers.IsSQ(k):
+							case types.IsSQ(k):
 								t = "S"
 							}
 							y, _ := strconv.Atoi(k[0:4])

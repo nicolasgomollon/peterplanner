@@ -1,8 +1,11 @@
 package types
 
 import (
+	"fmt"
 	"math"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -50,6 +53,85 @@ func cmpGrade(grA string, grB string) int64 {
 	}
 	
 	return comparison
+}
+
+func IsAcademicTerm(term string) bool {
+	if len(term) == 7 {
+		switch term[5:] {
+		case "92", "03", "14":
+			return true
+		}
+	}
+	return false
+}
+
+func IsFQ(term string) bool {
+	if IsAcademicTerm(term) {
+		return term[5:] == "92"
+	}
+	return false
+}
+
+func IsWQ(term string) bool {
+	if IsAcademicTerm(term) {
+		return term[5:] == "03"
+	}
+	return false
+}
+
+func IsSQ(term string) bool {
+	if IsAcademicTerm(term) {
+		return term[5:] == "14"
+	}
+	return false
+}
+
+func FallQuarter(year int) string {
+	return fmt.Sprintf("%v-92", year)
+}
+
+func WinterQuarter(year int) string {
+	return fmt.Sprintf("%v-03", year)
+}
+
+func SpringQuarter(year int) string {
+	return fmt.Sprintf("%v-14", year)
+}
+
+func YearFQ() int {
+	currentDate := time.Now()
+	year := currentDate.Year()
+	return year
+}
+
+func YearWQ() int {
+	currentDate := time.Now()
+	year := currentDate.Year()
+	month := currentDate.Month()
+	if month > time.June {
+		year++
+	}
+	return year
+}
+
+func YearSQ() int {
+	currentDate := time.Now()
+	year := currentDate.Year()
+	month := currentDate.Month()
+	if month > time.June {
+		year++
+	}
+	return year
+}
+
+func AcademicYear() int {
+	currentDate := time.Now()
+	year := currentDate.Year()
+	month := currentDate.Month()
+	if month <= time.June {
+		year--
+	}
+	return year
 }
 
 type Time struct {
@@ -120,6 +202,25 @@ type Class struct {
 	Place      string         `json:"place"`
 }
 
+type CourseGroup struct {
+	Department string   `json:"department"`
+	Numbers    []string `json:"numbers"`
+}
+
+type CourseGroups []CourseGroup
+
+func (slice CourseGroups) Len() int {
+	return len(slice)
+}
+
+func (slice CourseGroups) Less(i, j int) bool {
+	return slice[i].Department < slice[j].Department
+}
+
+func (slice CourseGroups) Swap(i, j int) {
+	slice[i], slice[j] = slice[j], slice[i]
+}
+
 type Course struct {
 	Department    string             `json:"department"`
 	Number        string             `json:"number"`
@@ -128,11 +229,37 @@ type Course struct {
 	Description   string             `json:"description"`
 	Grade         string             `json:"grade"`
 	Prerequisites [][]string         `json:"prerequisites"`
+	RequiredBy    CourseGroups       `json:"requiredby"`
 	Classes       map[string][]Class `json:"classes"`
+	Offered       map[string][]int   `json:"offered"`
 }
 
 func (course Course) Key() string {
 	return strings.Replace(strings.ToUpper(course.Department + course.Number), " ", "", -1)
+}
+
+func (course Course) TermsOffered() map[string][]int {
+	termsOffered := make(map[string][]int, 0)
+	for k := range course.Classes {
+		t := "--"
+		switch {
+		case IsFQ(k):
+			t = "F"
+		case IsWQ(k):
+			t = "W"
+		case IsSQ(k):
+			t = "S"
+		}
+		y, _ := strconv.Atoi(k[0:4])
+		years := termsOffered[t]
+		if years == nil {
+			years = make([]int, 0)
+		}
+		years = append(years, y)
+		sort.Sort(sort.Reverse(sort.IntSlice(years)))
+		termsOffered[t] = years
+	}
+	return termsOffered
 }
 
 func (course Course) ClearedPrereqs(student *Student) bool {
