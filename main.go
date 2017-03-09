@@ -132,7 +132,10 @@ func GetCatalogue() (types.Catalogue, error) {
 }
 
 func parse(doc *etree.Document, outputJSON bool) {
-	catalogue, _ := GetCatalogue()
+	catalogue, err := GetCatalogue()
+	if err != nil {
+		panic(err)
+	}
 	
 	student := parsers.Parse(doc, &catalogue)
 	student.Terms = catalogue.Terms
