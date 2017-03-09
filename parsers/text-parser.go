@@ -24,8 +24,12 @@ func SDepartmentOptions() (string, map[string]string, error) {
 	} else if statusCode != http.StatusOK {
 		return "", nil, errors.New(fmt.Sprintf("ERROR: Unable to fetch WebSOC HTML file. HTTP status code: %v.", statusCode))
 	}
-	r, _ := regexp.Compile(`<option value="(.*?)".*?>`)
-	term := r.FindStringSubmatch(responseHTML)[1]
+	r, _ := regexp.Compile(`<option value="(\d{4}-(?:92|03|14))".*?selected="selected">`)
+	terms := r.FindAllStringSubmatch(responseHTML, -1)
+	if len(terms) == 0 {
+		return "", nil, errors.New("WebSOC is not currently in an academic term.")
+	}
+	term := terms[0][1]
 	r, _ = regexp.Compile(`(?s)<select name="Dept">(.*?)</select>`)
 	departments := r.FindStringSubmatch(responseHTML)[1]
 	r, _ = regexp.Compile(`<option value="(.*?)">`)
