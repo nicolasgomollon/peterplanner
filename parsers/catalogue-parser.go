@@ -46,20 +46,22 @@ func FetchCatalogue(deptURL string) (string, error) {
 }
 
 func ParseCatalogue(responseHTML string, courses *map[string]types.Course) {
+	s, _ := regexp.Compile(`([\r\n]+[\s\p{Zs}]?|[\s\p{Zs}])`)
+	
 	r, _ := regexp.Compile(`<h1>.*? \(([^\(\)]*?)\)</h1>`)
 	dept := r.FindStringSubmatch(responseHTML)[1]
-	dept = strings.Replace(strings.ToUpper(dept), " ", "", -1)
+	dept = strings.Replace(strings.ToUpper(Clean(dept)), " ", "", -1)
 	
 	r, _ = regexp.Compile(`(?s)<div class="courses">(.*)</div></div>`)
 	coursesBlock := r.FindStringSubmatch(responseHTML)[1]
 	
-	r, _ = regexp.Compile(`(?s)<div class="courseblock">.*?<p class="courseblocktitle"><strong>(.*?)&#160;(.*?)\.\s*(.*?)\..*?</strong></p>.*?<p class="courseblockdesc">.*?<p>(.*?)</p>.*?</div>`)
+	r, _ = regexp.Compile(`(?s)<div class="courseblock">.*?<p class="courseblocktitle"><strong>(.*?)\.\s*(.*?)\..*?</strong></p>.*?<p class="courseblockdesc">.*?<p>(.*?)</p>.*?</div>`)
 	cs := r.FindAllStringSubmatch(coursesBlock, -1)
 	
 	for _, c := range cs {
-		number := c[2]
-		title := c[3]
-		description := c[4]
+		number := s.ReplaceAllString(strings.ToUpper(Clean(c[1])), "")[len(dept):]
+		title := c[2]
+		description := c[3]
 		course := types.Course{Department: dept, Number: number, Title: title, Description: description}
 		(*courses)[course.Key()] = course
 	}

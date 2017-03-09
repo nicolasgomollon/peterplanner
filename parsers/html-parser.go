@@ -76,36 +76,36 @@ func ParsePrerequisites(responseHTML string, courses *map[string]types.Course) {
 			case 0:
 				matches := p.FindStringSubmatch(element)
 				if len(matches) > 0 {
-					k = strings.ToUpper(clean(matches[1]))
+					k = strings.ToUpper(Clean(matches[1]))
 					k = strings.Replace(k, " ", "", -1)
-					kp = strings.ToUpper(clean(matches[2]))
+					kp = strings.ToUpper(Clean(matches[2]))
 					kp = strings.Replace(kp, " ", "", -1)
 				} else {
-					k = strings.ToUpper(clean(element))
+					k = strings.ToUpper(Clean(element))
 					k = strings.Replace(k, " ", "", -1)
 				}
 				break
 			case 1:
-				t = clean(element)
+				t = Clean(element)
 				break
 			case 2:
 				if course, ok := (*courses)[k]; ok {
 					course.ShortTitle = t
-					course.Prerequisites = parsedPrerequisites(clean(element))
+					course.Prerequisites = parsedPrerequisites(Clean(element))
 					(*courses)[k] = course
 				} else if len(dept) < len(k) {
 					course := types.Course{Department: dept, Number: k[len(dept):], ShortTitle: t}
-					course.Prerequisites = parsedPrerequisites(clean(element))
+					course.Prerequisites = parsedPrerequisites(Clean(element))
 					(*courses)[k] = course
 				}
 				if len(kp) > 0 {
 					if course, ok := (*courses)[kp]; ok {
 						course.ShortTitle = t
-						course.Prerequisites = parsedPrerequisites(clean(element))
+						course.Prerequisites = parsedPrerequisites(Clean(element))
 						(*courses)[kp] = course
 					} else if len(dept) < len(kp) {
 						course := types.Course{Department: dept, Number: kp[len(dept):], ShortTitle: t}
-						course.Prerequisites = parsedPrerequisites(clean(element))
+						course.Prerequisites = parsedPrerequisites(Clean(element))
 						(*courses)[kp] = course
 					}
 				}
@@ -120,11 +120,13 @@ func ParsePrerequisites(responseHTML string, courses *map[string]types.Course) {
 	}
 }
 
-func clean(element string) string {
+func Clean(element string) string {
+	s1, _ := regexp.Compile(`(&#160;)`)
+	s2, _ := regexp.Compile(`([\r\n]+[\s\p{Zs}]?|[\s\p{Zs}]{2,})`)
 	element = sanitize.HTML(element)			// Remove HTML tags.
+	element = s1.ReplaceAllString(element, " ")	// Replace non-breaking space with a space.
 	element = strings.TrimSpace(element)		// Trim leading and trailing whitespace.
-	s, _ := regexp.Compile(`([\r\n]+[\s\p{Zs}]?|[\s\p{Zs}]{2,})`)
-	element = s.ReplaceAllString(element, " ")	// Replace consecutive spaces with one.
+	element = s2.ReplaceAllString(element, " ")	// Replace consecutive spaces with one.
 	element = html.UnescapeString(element)		// Decode HTML entities.
 	return element
 }
