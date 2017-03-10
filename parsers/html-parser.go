@@ -147,7 +147,7 @@ func parsedPrerequisites(rawPrereqs string) [][]string {
 		row := strings.Split(rawRow, " OR ")
 		cleanRow := make([]string, 0)
 		for _, r := range row {
-			if !strings.HasPrefix(r, "NO REPEATS ALLOWED") && !strings.HasPrefix(r, "BETTER") {
+			if !strings.HasPrefix(r, "NO REPEATS ALLOWED") && !strings.HasPrefix(r, "BETTER") && !strings.HasPrefix(r, "SCHOOL OF") {
 				cleanRow = append(cleanRow, r)
 			}
 		}
