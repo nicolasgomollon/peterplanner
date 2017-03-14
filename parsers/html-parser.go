@@ -1,6 +1,7 @@
 package parsers
 
 import (
+	"bitbucket.org/zombiezen/cardcpx/natsort"
 	"errors"
 	"fmt"
 	"github.com/kennygrant/sanitize"
@@ -152,6 +153,7 @@ func parsedPrerequisites(rawPrereqs string) [][]string {
 			}
 		}
 		if len(cleanRow) > 0 {
+			natsort.Strings(cleanRow)
 			prereqs = append(prereqs, cleanRow)
 		}
 	}
