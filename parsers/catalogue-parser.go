@@ -73,7 +73,7 @@ func ParseCatalogue(responseHTML string, courses *map[string]types.Course) {
 	r, _ = regexp.Compile(`(?s)<div class="courses">(.*)</div></div>`)
 	coursesBlock := r.FindStringSubmatch(responseHTML)[1]
 	
-	r, _ = regexp.Compile(`(?s)<div class="courseblock">.*?<p class="courseblocktitle"><strong>(.*?)\.\s*(.*?)\..*?</strong></p>.*?<p class="courseblockdesc">.*?<p>(.*?)</p>.*?</div>`)
+	r, _ = regexp.Compile(`(?s)<div class="courseblock">.*?<p class="courseblocktitle"><strong>(.*?)\.\s*(.*?)\..*?</strong></p>.*?<div class="courseblockdesc">.*?<p>(.*?)</p>.*?</div>`)
 	cs := r.FindAllStringSubmatch(coursesBlock, -1)
 	
 	for _, c := range cs {
