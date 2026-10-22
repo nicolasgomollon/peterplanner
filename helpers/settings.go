@@ -21,17 +21,39 @@ package helpers
 import (
 	"encoding/json"
 	"io/ioutil"
+	"net"
+	"strconv"
+
+	"github.com/go-sql-driver/mysql"
 )
 
 type Database struct {
-	Kind        string `json:"kind"`
-	Name        string `json:"name"`
-	Username    string `json:"username"`
-	Password    string `json:"password"`
+	Kind     string `json:"kind"`
+	Name     string `json:"name"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
 }
 
 func (db Database) Credentials() string {
-	return db.Username + ":" + db.Password + "@/" + db.Name
+	host := db.Host
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	port := db.Port
+	if port == 0 {
+		port = 3306
+	}
+	config := mysql.NewConfig()
+	config.User = db.Username
+	config.Passwd = db.Password
+	config.Net = "tcp"
+	config.Addr = net.JoinHostPort(host, strconv.Itoa(port))
+	config.DBName = db.Name
+	// Preserve the legacy driver's server-side max_allowed_packet lookup.
+	config.MaxAllowedPacket = 0
+	return config.FormatDSN()
 }
 
 func DatabaseFromFile(filepath string) (Database, error) {
