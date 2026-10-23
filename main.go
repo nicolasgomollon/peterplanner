@@ -256,10 +256,15 @@ func main() {
 		}
 
 		db, err := helpers.DatabaseFromFile(helpers.ConfigPath())
+		if err != nil {
+			panic(fmt.Errorf("could not load database configuration: %w", err))
+		}
+
 		dbConn, err := database.Connect(db)
 		if err != nil {
-			panic(errors.New(fmt.Sprintf("ERROR: Could not create new database connection. `%v`.", err.Error())))
+			panic(fmt.Errorf("could not connect to database: %w", err))
 		}
+		defer dbConn.Close()
 
 		studentExists, uid, err := database.RowExists(dbConn, "SELECT `uid` FROM `accounts` WHERE `studentID`=? LIMIT 1", *studentIDptr)
 		if !studentExists && (err == nil) {
@@ -301,10 +306,15 @@ func main() {
 		fmt.Println(string(exportJSON))
 	} else if len(*uidPtr) > 0 {
 		db, err := helpers.DatabaseFromFile(helpers.ConfigPath())
+		if err != nil {
+			panic(fmt.Errorf("could not load database configuration: %w", err))
+		}
+
 		dbConn, err := database.Connect(db)
 		if err != nil {
-			panic(errors.New(fmt.Sprintf("ERROR: Could not create new database connection. `%v`.", err.Error())))
+			panic(fmt.Errorf("could not connect to database: %w", err))
 		}
+		defer dbConn.Close()
 
 		studentExists, studentID, _ := database.RowExists(dbConn, "SELECT `studentID` FROM `accounts` WHERE `uid`=? LIMIT 1", *uidPtr)
 		if studentExists {
