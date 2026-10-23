@@ -72,17 +72,17 @@ func ParsePrerequisites(responseHTML string, courses *map[string]types.Course) {
 	r, _ := regexp.Compile(`(?s)<table border="0">.*?<tr>.*?<td align="center">.*?<h3>(.*?)</h3>.*?</td>`)
 	dept := r.FindStringSubmatch(responseHTML)[1]
 	dept = strings.Replace(strings.ToUpper(dept), " ", "", -1)
-	
+
 	r, _ = regexp.Compile(`(?s)<table width="800"(?:[^>]*)>(.*?)<\/table>`)
 	rawPrereqs := r.FindStringSubmatch(responseHTML)[1]
-	
+
 	r, _ = regexp.Compile(`(?s)<tr>(.*?)<\/tr>`)
 	prereqs := r.FindAllStringSubmatch(rawPrereqs, -1)
-	
+
 	r, _ = regexp.Compile(`(?s)<td.*?>(.*?)<\/td>`)
-	
+
 	p, _ := regexp.Compile(`(?s)(.*)<span.*?>\* (.*?) since .*?<\/span>`)
-	
+
 	for _, prereqSlice := range prereqs {
 		prereq := prereqSlice[1]
 		elements := r.FindAllStringSubmatch(prereq, -1)
@@ -142,24 +142,24 @@ func ParsePrerequisites(responseHTML string, courses *map[string]types.Course) {
 func Clean(element string) string {
 	s1, _ := regexp.Compile(`(&#160;)`)
 	s2, _ := regexp.Compile(`([\r\n]+[\s\p{Zs}]?|[\s\p{Zs}]{2,})`)
-	element = sanitize.HTML(element)			// Remove HTML tags.
-	element = s1.ReplaceAllString(element, " ")	// Replace non-breaking space with a space.
-	element = strings.TrimSpace(element)		// Trim leading and trailing whitespace.
-	element = s2.ReplaceAllString(element, " ")	// Replace consecutive spaces with one.
-	element = html.UnescapeString(element)		// Decode HTML entities.
+	element = sanitize.HTML(element)            // Remove HTML tags.
+	element = s1.ReplaceAllString(element, " ") // Replace non-breaking space with a space.
+	element = strings.TrimSpace(element)        // Trim leading and trailing whitespace.
+	element = s2.ReplaceAllString(element, " ") // Replace consecutive spaces with one.
+	element = html.UnescapeString(element)      // Decode HTML entities.
 	return element
 }
 
 func parsedPrerequisites(rawPrereqs string) [][]string {
 	r, _ := regexp.Compile(`(?s) \( (?:coreq|recommended|min score = [\w+-]+) \)`)
 	element := r.ReplaceAllString(rawPrereqs, "")
-	
+
 	r, _ = regexp.Compile(`(?s) \( min grade = ([\w+-]+) \)`)
 	element = r.ReplaceAllString(element, `|$1`)
-	
+
 	r, _ = regexp.Compile(`(?s)(\( | \))`)
 	element = r.ReplaceAllString(element, "")
-	
+
 	prereqs := make([][]string, 0)
 	rawArr := strings.Split(element, " AND ")
 	for _, rawRow := range rawArr {
@@ -175,6 +175,6 @@ func parsedPrerequisites(rawPrereqs string) [][]string {
 			prereqs = append(prereqs, cleanRow)
 		}
 	}
-	
+
 	return prereqs
 }

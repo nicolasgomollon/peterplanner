@@ -67,10 +67,10 @@ func fetchStudentDetails(studentID, cookie string) (string, string, string, stri
 	} else if statusCode != http.StatusOK {
 		return "", "", "", "", "", errors.New(fmt.Sprintf("ERROR: Unable to fetch DegreeWorks HTML file. HTTP status code: %v.", statusCode))
 	}
-	
+
 	r, _ := regexp.Compile(`(?s)<StudentData>(.*)</StudentData>`)
 	studentData := r.FindStringSubmatch(responseHTML)[1]
-	
+
 	r, _ = regexp.Compile(`(?s)<GoalDtl.*School="(?P<school>.*?)".*Degree="(?P<degree_code>.*?)".*StuLevel="(?P<student_level_code>.*?)".*</GoalDtl>.*<GoalDataDtl.*?GoalCode="MAJOR".*?GoalValue="(?P<major_code>.*?)".*?</GoalDataDtl>`)
 	matches := r.FindStringSubmatch(studentData)
 	groups := make(map[string]string)
@@ -79,16 +79,16 @@ func fetchStudentDetails(studentID, cookie string) (string, string, string, stri
 			groups[name] = matches[i]
 		}
 	}
-	
+
 	r, _ = regexp.Compile(fmt.Sprintf(`(?s)sMajorPicklist\[sMajorPicklist\.length\] = new DataItem\("%s *", "(.*?) *"\);`, groups["major_code"]))
 	studentMajor := r.FindStringSubmatch(responseHTML)[1]
-	
+
 	r, _ = regexp.Compile(fmt.Sprintf(`(?s)sLevelPicklist\[sLevelPicklist\.length\] = new DataItem\("%s *", "(.*?) *"\);`, groups["student_level_code"]))
 	studentLevel := r.FindStringSubmatch(responseHTML)[1]
-	
+
 	r, _ = regexp.Compile(fmt.Sprintf(`(?s)sDegreePicklist\[sDegreePicklist\.length\] = new DataItem\("%s *", "(.*?) *"\);`, groups["degree_code"]))
 	degreeName := r.FindStringSubmatch(responseHTML)[1]
-	
+
 	return groups["school"], groups["degree_code"], degreeName, studentLevel, studentMajor, nil
 }
 
@@ -154,11 +154,11 @@ func parse(doc *etree.Document, outputJSON bool) {
 	if err != nil {
 		panic(err)
 	}
-	
+
 	student := parsers.Parse(doc, &catalogue)
 	student.Terms = catalogue.Terms
 	yearTerm := student.Terms[0]
-	
+
 	if !outputJSON {
 		for _, block := range student.Blocks {
 			fmt.Printf("%v: %v\n", block.ReqType, block.Title)
@@ -203,7 +203,7 @@ func parse(doc *etree.Document, outputJSON bool) {
 						if cleared {
 							icon = "✓"
 						}
-						
+
 						fmt.Printf("        %-35s   offered: %v\n", fmt.Sprintf("%v %v %v: %v", icon, course.Department, course.Number, course.Title), termsOffered)
 						if cleared {
 							for _, class := range course.Classes[yearTerm] {
@@ -232,9 +232,9 @@ func printArray(prereqs [][]string) {
 		if i == (len(prereqs) - 1) {
 			sep = ""
 		}
-		
+
 		fmt.Printf("%s[\"", spaces)
-		fmt.Printf(strings.Join(prereqInter, "\", \""))
+		fmt.Print(strings.Join(prereqInter, "\", \""))
 		fmt.Printf("\"]%s\n", sep)
 	}
 }
@@ -254,13 +254,13 @@ func main() {
 			}
 			*studentIDptr = studentID
 		}
-		
+
 		db, err := helpers.DatabaseFromFile("/var/www/config/settings.json")
 		dbConn, err := database.Connect(db)
 		if err != nil {
 			panic(errors.New(fmt.Sprintf("ERROR: Could not create new database connection. `%v`.", err.Error())))
 		}
-		
+
 		studentExists, uid, err := database.RowExists(dbConn, "SELECT `uid` FROM `accounts` WHERE `studentID`=? LIMIT 1", *studentIDptr)
 		if !studentExists && (err == nil) {
 			timestamp := time.Now().Format(time.RFC3339)
@@ -274,26 +274,26 @@ func main() {
 				panic(err)
 			}
 		}
-		
+
 		school, degree, degreeName, studentLevel, studentMajor, err := fetchStudentDetails(*studentIDptr, *cookiePtr)
 		if err != nil {
 			panic(err)
 		}
-		
+
 		responseXML, err := fetchXML(*studentIDptr, school, degree, degreeName, studentLevel, studentMajor, *cookiePtr)
 		if err != nil {
 			panic(err)
 		}
-		
+
 		filepath := fmt.Sprintf("/var/www/reports/DGW_Report-%v.xsl", *studentIDptr)
 		err = ioutil.WriteFile(filepath, []byte(responseXML), 0644)
 		if err != nil {
 			panic(err)
 		}
-		
+
 		output := make(map[string]string, 0)
 		output["uid"] = uid
-		
+
 		exportJSON, err := json.Marshal(output)
 		if err != nil {
 			panic(err)
@@ -305,7 +305,7 @@ func main() {
 		if err != nil {
 			panic(errors.New(fmt.Sprintf("ERROR: Could not create new database connection. `%v`.", err.Error())))
 		}
-		
+
 		studentExists, studentID, _ := database.RowExists(dbConn, "SELECT `studentID` FROM `accounts` WHERE `uid`=? LIMIT 1", *uidPtr)
 		if studentExists {
 			readFromFile(fmt.Sprintf("/var/www/reports/DGW_Report-%v.xsl", studentID), *jsonPtr)

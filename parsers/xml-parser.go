@@ -33,14 +33,14 @@ func Parse(doc *etree.Document, catalogue *types.Catalogue) types.Student {
 	taken := make(map[string]bool, 0)
 	enrolled := make(map[string]string, 0)
 	blocks := make([]types.Block, 0)
-	
+
 	root := doc.SelectElement("Report").SelectElement("Audit")
 	audit := root.SelectElement("AuditHeader")
 	studentID := audit.SelectAttrValue("Stu_id", "XXXXXXXX")
 	name := audit.SelectAttrValue("Stu_name", "ANTEATER, PETER THE")
 	email := audit.SelectAttrValue("Stu_email", "PTANTEATER@UCI.EDU")
 	student := types.Student{StudentID: studentID, Name: name, Email: email}
-	
+
 	activeTerm := ""
 	deginfo := root.SelectElement("Deginfo")
 	if deginfo != nil {
@@ -49,7 +49,7 @@ func Parse(doc *etree.Document, catalogue *types.Catalogue) types.Student {
 			activeTerm = degreeData.SelectAttrValue("Actv_term", "")
 		}
 	}
-	
+
 	clsinfo := root.SelectElement("Clsinfo")
 	if clsinfo != nil {
 		for _, class := range clsinfo.SelectElements("Class") {
@@ -58,29 +58,29 @@ func Parse(doc *etree.Document, catalogue *types.Catalogue) types.Student {
 			cTitle := class.SelectAttrValue("Course_title", "")
 			cTerm := class.SelectAttrValue("Term", "")
 			cInProgress := class.SelectAttrValue("In_progress", "N")
-			key := strings.Replace(strings.ToUpper(cDept + cNum), " ", "", -1)
+			key := strings.Replace(strings.ToUpper(cDept+cNum), " ", "", -1)
 			if (cInProgress == "Y") && (cTerm > activeTerm) {
 				enrolled[key] = cTitle
 			}
 		}
 	}
-	
+
 	for _, block := range root.SelectElements("Block") {
 		reqType := block.SelectAttrValue("Req_type", "unknown")
 		switch reqType {
 		case "DEGREE":
 			gpa, _ := strconv.ParseFloat(block.SelectAttrValue("GPA", "0.0"), 64)
 			student.GPA = gpa
-			
+
 			percentComplete, _ := strconv.ParseFloat(block.SelectAttrValue("Per_complete", "0.0"), 64)
 			student.PercentComplete = percentComplete
-			
+
 			creditsApplied, _ := strconv.ParseFloat(block.SelectAttrValue("Credits_applied", "0.0"), 64)
 			student.CreditsApplied = creditsApplied
-			
+
 			classLevelKey := strings.Replace(fmt.Sprintf("%v STANDING ONLY", student.ClassLevel()), " ", "", -1)
 			taken[classLevelKey] = true
-			
+
 			standingKey := strings.Replace(fmt.Sprintf("%v STANDING ONLY", student.Standing()), " ", "", -1)
 			taken[standingKey] = true
 			break
@@ -94,11 +94,11 @@ func Parse(doc *etree.Document, catalogue *types.Catalogue) types.Student {
 			break
 		}
 	}
-	
+
 	student.Courses = courses
 	student.Taken = taken
 	student.Blocks = blocks
-	
+
 	return student
 }
 
@@ -145,7 +145,7 @@ func parseRule(rule *etree.Element, catalogue *types.Catalogue, courses *map[str
 	requirement := types.Requirement{}
 	options := make([]string, 0)
 	completed := make([]string, 0)
-	
+
 	// Required Classes
 	requirementBlock := rule.SelectElement("Requirement")
 	if requirementBlock != nil {
@@ -154,8 +154,8 @@ func parseRule(rule *etree.Element, catalogue *types.Catalogue, courses *map[str
 		for _, course := range requirementBlock.SelectElements("Course") {
 			cDept := course.SelectAttrValue("Disc", "DEPT")
 			cNum := course.SelectAttrValue("Num", "0")
-			
-			key := strings.Replace(strings.ToUpper(cDept + cNum), " ", "", -1)
+
+			key := strings.Replace(strings.ToUpper(cDept+cNum), " ", "", -1)
 			if c, ok := (*catalogue).Courses[key]; ok {
 				(*courses)[key] = c
 			} else {
@@ -165,7 +165,7 @@ func parseRule(rule *etree.Element, catalogue *types.Catalogue, courses *map[str
 			options = append(options, key)
 		}
 	}
-	
+
 	// Taken Classes
 	applied := rule.SelectElement("ClassesApplied")
 	if applied != nil {
@@ -173,7 +173,7 @@ func parseRule(rule *etree.Element, catalogue *types.Catalogue, courses *map[str
 			cDept := course.SelectAttrValue("Discipline", "DEPT")
 			cNum := course.SelectAttrValue("Number", "0")
 			cGrade := course.SelectAttrValue("Letter_grade", "")
-			
+
 			c := types.Course{Department: cDept, Number: cNum}
 			key := c.Key()
 			if cc, ok := (*courses)[key]; ok {
@@ -181,7 +181,7 @@ func parseRule(rule *etree.Element, catalogue *types.Catalogue, courses *map[str
 			} else if cc, ok := (*catalogue).Courses[key]; ok {
 				c = cc
 			}
-			
+
 			if cGrade != "IP" {
 				c.Grade = cGrade
 				(*taken)[key] = true
@@ -197,7 +197,7 @@ func parseRule(rule *etree.Element, catalogue *types.Catalogue, courses *map[str
 			(*courses)[key] = c
 		}
 	}
-	
+
 	requirement.Options = options
 	requirement.Completed = completed
 	return requirement

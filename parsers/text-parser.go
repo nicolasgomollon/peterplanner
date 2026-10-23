@@ -119,11 +119,11 @@ func ParseWebSOC(yearTerm, responseTXT string, courses *map[string]types.Course)
 		instTkn := Token{}
 		timeTkn := Token{}
 		placeTkn := Token{}
-		
+
 		cDept := ""
 		cNum := ""
 		cTitle := ""
-		
+
 		for scanner.Scan() {
 			line := scanner.Text()
 			if len(line) == 0 {
@@ -148,28 +148,28 @@ func ParseWebSOC(yearTerm, responseTXT string, courses *map[string]types.Course)
 				// First line of data for course.
 				// Recalculate all values.
 				width = len(line)
-				
+
 				tabTkn.Start = 0
 				tabTkn.End = strings.Index(line, "CCode")
-				
+
 				ccodeTkn.Start = tabTkn.End
 				ccodeTkn.End = strings.Index(line, "Typ") - 1
-				
+
 				typTkn.Start = ccodeTkn.End + 1
 				typTkn.End = strings.Index(line, "Sec") - 1
-				
+
 				secTkn.Start = typTkn.End + 1
 				secTkn.End = strings.Index(line, "Unt") - 1
-				
+
 				untTkn.Start = secTkn.End + 1
 				untTkn.End = strings.Index(line, "Instructor") - 1
-				
+
 				instTkn.Start = untTkn.End + 1
 				instTkn.End = strings.Index(line, "Time") - 1
-				
+
 				timeTkn.Start = instTkn.End + 1
 				timeTkn.End = strings.Index(line, "Place") - 1
-				
+
 				placeTkn.Start = timeTkn.End + 1
 				placeTkn.End = strings.Index(line, "Final") - 1
 				continue
@@ -196,8 +196,8 @@ func ParseWebSOC(yearTerm, responseTXT string, courses *map[string]types.Course)
 			}
 			class.Place = strings.TrimSpace(line[placeTkn.Start:placeTkn.End])
 			//fmt.Printf("`%v` `%v` `%v` `%v` `%v` `%v` `%v`\n", class.Code, class.Type, class.Section, class.Instructor, class.Days, class.Time, class.Place)
-			
-			k := strings.Replace(cDept + cNum, " ", "", -1)
+
+			k := strings.Replace(cDept+cNum, " ", "", -1)
 			if course, ok := (*courses)[k]; ok {
 				if len(course.ShortTitle) == 0 {
 					course.ShortTitle = cTitle

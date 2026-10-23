@@ -36,25 +36,25 @@ func cmpGrade(grA string, grB string) int64 {
 	} else if len(grB) == 0 {
 		return math.MaxInt64
 	}
-	
+
 	cmpGrA := grA
 	cmpGrA = strings.Replace(cmpGrA, "+", "", -1)
 	cmpGrA = strings.Replace(cmpGrA, "-", "", -1)
 	cmpGrA = strings.ToUpper(cmpGrA)
-	
+
 	cmpGrB := grB
 	cmpGrB = strings.Replace(cmpGrB, "+", "", -1)
 	cmpGrB = strings.Replace(cmpGrB, "-", "", -1)
 	cmpGrB = strings.ToUpper(cmpGrB)
-	
+
 	var comparison int64 = 0
 	if cmpGrA == cmpGrB {
 		grAplus := strings.Contains(grA, "+")
 		grAminus := strings.Contains(grA, "-")
-		
+
 		grBplus := strings.Contains(grB, "+")
 		grBminus := strings.Contains(grB, "-")
-		
+
 		if grAplus && !grBplus {
 			comparison = -1
 		} else if !grAplus && grBplus {
@@ -69,7 +69,7 @@ func cmpGrade(grA string, grB string) int64 {
 	} else if cmpGrA > cmpGrB {
 		comparison = 1
 	}
-	
+
 	return comparison
 }
 
@@ -165,26 +165,26 @@ func ParseTime(cTime string) Time {
 	cStart := strings.TrimSpace(cTime[0:5])
 	cEnd := strings.TrimSpace(cTime[6:11])
 	pm := (len(cTime) == 12)
-	
+
 	format := "3:04"
 	start, _ := time.Parse(format, cStart)
 	end, _ := time.Parse(format, cEnd)
-	
+
 	if (end.Hour() < 12) && pm {
 		end = end.Add(time.Hour * time.Duration(12))
 	}
-	
+
 	if end.Sub(start).Hours() >= 12.0 {
 		start = start.Add(time.Hour * time.Duration(12))
 	}
-	
+
 	return Time{Start: start, End: end}
 }
 
 func ParseDays(cDays string) []time.Weekday {
 	r, _ := regexp.Compile(`[A-Z][a-z]?`)
 	rawDays := r.FindAllStringSubmatch(cDays, -1)
-	
+
 	days := make([]time.Weekday, len(rawDays))
 	for i, rawDay := range rawDays {
 		switch rawDay[0] {
@@ -206,7 +206,7 @@ func ParseDays(cDays string) []time.Weekday {
 			break
 		}
 	}
-	
+
 	return days
 }
 
@@ -253,7 +253,7 @@ type Course struct {
 }
 
 func (course Course) Key() string {
-	return strings.Replace(strings.ToUpper(course.Department + course.Number), " ", "", -1)
+	return strings.Replace(strings.ToUpper(course.Department+course.Number), " ", "", -1)
 }
 
 func (course Course) TermsOffered() map[string][]int {
