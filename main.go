@@ -137,7 +137,7 @@ func readFromFile(fileName string, outputJSON bool) {
 }
 
 func GetCatalogue() (types.Catalogue, error) {
-	b, err := ioutil.ReadFile("/var/www/registrar/catalogue.json")
+	b, err := ioutil.ReadFile(helpers.RegistrarPath("catalogue.json"))
 	if err != nil {
 		panic(err)
 	}
@@ -255,7 +255,7 @@ func main() {
 			*studentIDptr = studentID
 		}
 
-		db, err := helpers.DatabaseFromFile("/var/www/config/settings.json")
+		db, err := helpers.DatabaseFromFile(helpers.ConfigPath())
 		dbConn, err := database.Connect(db)
 		if err != nil {
 			panic(errors.New(fmt.Sprintf("ERROR: Could not create new database connection. `%v`.", err.Error())))
@@ -285,8 +285,8 @@ func main() {
 			panic(err)
 		}
 
-		filepath := fmt.Sprintf("/var/www/reports/DGW_Report-%v.xsl", *studentIDptr)
-		err = ioutil.WriteFile(filepath, []byte(responseXML), 0644)
+		dirPath := helpers.ReportPath(*studentIDptr)
+		err = ioutil.WriteFile(dirPath, []byte(responseXML), 0644)
 		if err != nil {
 			panic(err)
 		}
@@ -300,7 +300,7 @@ func main() {
 		}
 		fmt.Println(string(exportJSON))
 	} else if len(*uidPtr) > 0 {
-		db, err := helpers.DatabaseFromFile("/var/www/config/settings.json")
+		db, err := helpers.DatabaseFromFile(helpers.ConfigPath())
 		dbConn, err := database.Connect(db)
 		if err != nil {
 			panic(errors.New(fmt.Sprintf("ERROR: Could not create new database connection. `%v`.", err.Error())))
@@ -308,12 +308,13 @@ func main() {
 
 		studentExists, studentID, _ := database.RowExists(dbConn, "SELECT `studentID` FROM `accounts` WHERE `uid`=? LIMIT 1", *uidPtr)
 		if studentExists {
-			readFromFile(fmt.Sprintf("/var/www/reports/DGW_Report-%v.xsl", studentID), *jsonPtr)
+			readFromFile(helpers.ReportPath(studentID), *jsonPtr)
 		} else {
 			fmt.Println("{}")
 		}
 	} else if len(*studentIDptr) > 0 {
-		readFromFile(fmt.Sprintf("/var/www/reports/DGW_Report-%v.xsl", *studentIDptr), *jsonPtr)
+		dirPath := helpers.ReportPath(*studentIDptr)
+		readFromFile(dirPath, *jsonPtr)
 	} else {
 		fmt.Println("No flags were specified. Use `-h` or `--help` flags to get help.")
 	}
